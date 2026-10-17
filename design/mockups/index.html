@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SafeHome · Referencia visual Estación</title>
+  <style>
+    :root {
+      --ink: #262646;
+      --muted: #71718d;
+      --violet: #5b57de;
+      --violet-2: #697de9;
+      --lavender: #efedff;
+      --lavender-2: #f8f8ff;
+      --line: #e2e1f3;
+      --coral: #ff817d;
+      --green: #16895d;
+      --red: #df5c61;
+      --gray: #7c7d96;
+      --white: #fff;
+      --shadow: 0 9px 24px rgba(42, 42, 91, .11);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 1180px;
+      background: #eef0fb;
+      color: var(--ink);
+      font-family: Nunito, "Segoe UI", Arial, sans-serif;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(2, 412px);
+      gap: 34px 70px;
+      justify-content: center;
+      padding: 44px 42px 60px;
+    }
+    .label { margin: 0 0 8px 14px; font-size: 14px; font-weight: 800; color: #44456a; }
+    .phone {
+      position: relative;
+      overflow: hidden;
+      width: 412px;
+      height: 840px;
+      background: var(--lavender-2);
+      border: 7px solid #202132;
+      border-radius: 38px;
+      box-shadow: 0 20px 46px rgba(35, 38, 76, .22);
+    }
+    .status { height: 32px; padding: 9px 18px 0; font-size: 11px; color: #36374a; }
+    .header {
+      height: 92px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 18px;
+      color: white;
+      background: linear-gradient(115deg, var(--violet-2), var(--violet));
+    }
+    .mark { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; background: rgba(255,255,255,.18); font-size: 20px; font-weight: 800; }
+    .brand { min-width: 0; flex: 1; }
+    .brand strong { display: block; font-size: 24px; line-height: 1.08; }
+    .brand span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; font-size: 13px; }
+    .pill { border: 0; border-radius: 999px; background: rgba(255,255,255,.18); color: inherit; padding: 8px 11px; font: inherit; font-size: 12px; font-weight: 800; }
+    .content { height: 635px; padding: 22px 18px 14px; }
+    .eyebrow { margin: 0 0 7px; color: var(--violet); font-size: 12px; font-weight: 900; letter-spacing: 1.45px; }
+    h1 { margin: 0; font-size: 28px; line-height: 1.08; letter-spacing: -.4px; }
+    .subtitle { margin: 9px 0 17px; color: var(--muted); font-size: 15px; line-height: 1.35; }
+    .card { border: 1px solid var(--line); border-radius: 25px; background: var(--white); box-shadow: 0 2px 5px rgba(46,46,76,.04); }
+    .home-card { padding: 18px; }
+    .home-top { display: flex; align-items: center; gap: 12px; }
+    .icon-box { width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 42px; border-radius: 14px; background: var(--lavender); color: var(--violet); font-size: 22px; }
+    .home-title { font-size: 17px; font-weight: 900; }
+    .home-sub { margin-top: 3px; color: var(--muted); font-size: 13px; }
+    .available { margin-left: auto; border-radius: 999px; padding: 8px 10px; background: #ebf8f0; color: var(--green); font-size: 12px; font-weight: 800; }
+    .dot { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 100%; vertical-align: baseline; background: currentColor; }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+    .metric { min-height: 66px; padding: 11px; border-radius: 17px; background: #fbfbff; }
+    .metric b { display:block; color: var(--ink); font-size: 20px; }
+    .metric span { display:block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .section-title { margin: 22px 0 10px; font-size: 16px; font-weight: 900; }
+    .event-row, .mobile-row { display: flex; align-items: center; gap: 11px; min-height: 64px; padding: 11px 13px; border-radius: 18px; background: var(--white); box-shadow: 0 3px 11px rgba(48,50,90,.045); }
+    .event-row + .event-row, .mobile-row + .mobile-row { margin-top: 10px; }
+    .event-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 12px; background: #eaf9f0; color: var(--green); font-size: 19px; }
+    .event-name, .mobile-name { font-size: 14px; font-weight: 900; }
+    .event-detail, .mobile-detail { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .chev { margin-left:auto; color: #787991; font-size: 22px; }
+    .system-card { display:flex; align-items:center; gap:16px; padding:18px; }
+    .power { width: 70px; height:70px; display:grid; place-items:center; flex:0 0 70px; border: 10px solid #d9f5e7; border-radius:100%; background:#39c887; color:#fff; font-size:32px; }
+    .system-copy b { display:block; font-size:19px; }
+    .system-copy span { display:block; margin-top:5px; color:var(--muted); font-size:13px; line-height:1.35; }
+    .danger-button { width:100%; margin-top:14px; border:0; border-radius:999px; padding:14px; background:var(--coral); color:#282643; font:inherit; font-size:15px; font-weight:900; }
+    .status-dot { width:11px; height:11px; flex:0 0 11px; border-radius:100%; }
+    .green { background:var(--green); color:var(--green); }
+    .red { background:var(--red); color:var(--red); }
+    .gray { background:var(--gray); color:var(--gray); }
+    .timeline { position:relative; padding-left:17px; }
+    .timeline:before { content:""; position:absolute; left:4px; top:12px; bottom:12px; width:2px; background:#dfe0ef; }
+    .timeline .event-row { position:relative; }
+    .timeline .event-row:before { content:""; position:absolute; left:-18px; top:27px; width:10px; height:10px; border-radius:100%; background:var(--green); }
+    .timeline .offline:before { background:var(--red); }
+    .pager { display:grid; grid-template-columns: 1fr 1.1fr 1fr; align-items:center; gap:10px; margin-top:14px; text-align:center; font-size:13px; font-weight:900; }
+    .pager button { height:42px; border:0; border-radius:16px; font:inherit; color:#976f78; background:#ffd0cf; }
+    .pager button:last-child { color:#252543; background:var(--coral); }
+    .account-card { padding: 8px 18px; }
+    .profile { display:flex; align-items:center; gap:12px; padding:12px 0 14px; }
+    .avatar { width:45px; height:45px; display:grid; place-items:center; border-radius:100%; background:var(--lavender); color:var(--violet); font-size:22px; }
+    .profile b { display:block; font-size:16px; }
+    .profile span { display:block; margin-top:3px; color:var(--muted); font-size:12px; }
+    .kv { display:flex; justify-content:space-between; gap:12px; padding:13px 0; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+    .kv b { color:var(--violet); text-align:right; }
+    .code { margin:11px 0 5px; padding:13px; border-radius:17px; background:var(--lavender); color:var(--violet); font-weight:900; letter-spacing:.8px; text-align:center; }
+    .request { display:flex; align-items:center; gap:12px; padding:14px; }
+    .request b { display:block; font-size:14px; }
+    .request span { display:block; margin-top:4px; color:var(--muted); font-size:12px; }
+    .nav { position:absolute; left:0; right:0; bottom:0; height:81px; display:grid; grid-template-columns:repeat(4,1fr); align-items:center; padding:8px 8px 12px; background:#fff; }
+    .nav-item { height:58px; display:grid; place-items:center; align-content:center; gap:3px; border-radius:19px; color:#686980; font-size:12px; }
+    .nav-item b { font-size:20px; line-height:1; }
+    .nav-item.active { color:#6378ec; background:var(--lavender); }
+    .footnote { grid-column:1/-1; max-width:894px; margin: 3px auto 0; color:#62637f; font-size:13px; line-height:1.5; }
+    .footnote code { padding:2px 5px; border-radius:5px; background:#e1e2ef; color:#33345f; }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <section><p class="label">Inicio · referencia</p><article class="phone"><div class="status">23:38</div><header class="header"><div class="mark">SH</div><div class="brand"><strong>SafeHome</strong><span>Estación · Hogar de Lucas</span></div><button class="pill">ACTIVO</button></header><div class="content"><p class="eyebrow">TU SISTEMA</p><h1>Hola, Lucas</h1><p class="subtitle">Todo está en orden en tu hogar.</p><div class="card home-card"><div class="home-top"><div class="icon-box">⌂</div><div><div class="home-title">Hogar de Lucas</div><div class="home-sub">Sistema operativo</div></div><div class="available"><span class="dot"></span>Disponible</div></div><div class="metrics"><div class="metric"><b>2</b><span>Móviles vinculados</span></div><div class="metric"><b>23:36</b><span>Última actividad</span></div></div></div><p class="section-title">Actividad reciente</p><div class="event-row"><div class="event-icon">▯</div><div><div class="event-name">Pepe conectó su Móvil</div><div class="event-detail">23:36</div></div><div class="chev">›</div></div><div class="event-row"><div class="event-icon" style="background:#fff0ef;color:#df5c61">⌁</div><div><div class="event-name">Pepe desconectó su Móvil</div><div class="event-detail">23:34</div></div><div class="chev">›</div></div></div><nav class="nav"><div class="nav-item active"><b>⌂</b>Inicio</div><div class="nav-item"><b>◉</b>Panel</div><div class="nav-item"><b>◴</b>Historial</div><div class="nav-item"><b>♟</b>Cuenta</div></nav></article></section>
+
+    <section><p class="label">Panel · referencia</p><article class="phone"><div class="status">23:38</div><header class="header"><div class="mark">SH</div><div class="brand"><strong>SafeHome</strong><span>Estación · Hogar de Lucas</span></div><button class="pill">ACTIVO</button></header><div class="content"><p class="eyebrow">ESTACIÓN</p><h1>Panel</h1><p class="subtitle">Administra el sistema y los móviles vinculados.</p><div class="card system-card"><div class="power">⏻</div><div class="system-copy"><b>Sistema activo</b><span>La estación está funcionando correctamente.</span></div></div><button class="danger-button">⏻ &nbsp;Apagar sistema</button><p class="eyebrow" style="margin-top:25px">MÓVILES</p><h2 class="section-title" style="font-size:23px;margin:0 0 6px">Móviles vinculados</h2><p class="subtitle">Presencia actual de los móviles aprobados.</p><div class="mobile-row"><div class="status-dot green"></div><div><div class="mobile-name">Pepe</div><div class="mobile-detail" style="color:#16895d">Activo</div></div><div class="chev">›</div></div><div class="mobile-row"><div class="status-dot gray"></div><div><div class="mobile-name">Pietro</div><div class="mobile-detail">Sin datos</div></div><div class="chev">›</div></div></div><nav class="nav"><div class="nav-item"><b>⌂</b>Inicio</div><div class="nav-item active"><b>◉</b>Panel</div><div class="nav-item"><b>◴</b>Historial</div><div class="nav-item"><b>♟</b>Cuenta</div></nav></article></section>
+
+    <section><p class="label">Historial · referencia</p><article class="phone"><div class="status">23:38</div><header class="header"><div class="mark">SH</div><div class="brand"><strong>SafeHome</strong><span>Estación · Hogar de Lucas</span></div><button class="pill">ACTIVO</button></header><div class="content"><p class="eyebrow">HOGAR ASIGNADO</p><h1>Historial</h1><p class="subtitle">Actividad de los móviles vinculados.</p><div class="timeline"><div class="event-row"><div class="event-icon">▯</div><div><div class="event-name">Pepe conectó su Móvil</div><div class="event-detail">23:36</div></div><div class="chev">›</div></div><div class="event-row offline"><div class="event-icon" style="background:#fff0ef;color:#df5c61">⌁</div><div><div class="event-name">Pepe desconectó su Móvil</div><div class="event-detail">23:36</div></div><div class="chev">›</div></div><div class="event-row"><div class="event-icon">▯</div><div><div class="event-name">Pepe conectó su Móvil</div><div class="event-detail">23:34</div></div><div class="chev">›</div></div></div><div class="pager"><button>Anterior</button><span>Página 1 de 1</span><button>Siguiente</button></div></div><nav class="nav"><div class="nav-item"><b>⌂</b>Inicio</div><div class="nav-item"><b>◉</b>Panel</div><div class="nav-item active"><b>◴</b>Historial</div><div class="nav-item"><b>♟</b>Cuenta</div></nav></article></section>
+
+    <section><p class="label">Cuenta · referencia</p><article class="phone"><div class="status">23:38</div><header class="header"><div class="mark">SH</div><div class="brand"><strong>SafeHome</strong><span>Estación · Hogar de Lucas</span></div><button class="pill">ACTIVO</button></header><div class="content"><p class="eyebrow">TU CUENTA</p><h1>Configuración</h1><p class="subtitle">Información de acceso y del sistema.</p><div class="card account-card"><div class="profile"><div class="avatar">●</div><div><b>Lucas</b><span>Estación · Hogar de Lucas</span></div></div><div class="kv"><span>Rol asignado</span><b>Estación</b></div><div class="kv"><span>Hogar</span><b>Hogar de Lucas</b></div><div class="code">7W7ALCFGKNG5&nbsp;&nbsp; ⧉</div></div><div class="card request" style="margin-top:14px"><div class="icon-box">♟</div><div><b>Solicitudes de vinculación</b><span>No hay solicitudes pendientes.</span></div><div class="chev">›</div></div><button class="pill" style="display:block;width:100%;margin-top:16px;background:#efedff;color:#5b57de;font-size:15px">⇥ &nbsp;Cerrar sesión</button></div><nav class="nav"><div class="nav-item"><b>⌂</b>Inicio</div><div class="nav-item"><b>◉</b>Panel</div><div class="nav-item"><b>◴</b>Historial</div><div class="nav-item active"><b>♟</b>Cuenta</div></nav></article></section>
+  </main>
+</body>
+</html>
