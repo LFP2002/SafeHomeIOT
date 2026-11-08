@@ -64,7 +64,8 @@ object ProtocoloSafeHome {
 enum class ValidacionEstacion { PENDIENTE, VERIFICADA, RECHAZADA }
 
 fun validarHandshakeEstacion(id: String?, rol: String?): ValidacionEstacion = when {
+    id != null && !Regex("SH-E-[A-Za-z0-9_-]{1,64}").matches(id) -> ValidacionEstacion.RECHAZADA
     rol != null && rol != "STATION" -> ValidacionEstacion.RECHAZADA
-    rol == "STATION" && id != null && Regex("SH-E-[A-Za-z0-9_-]{1,64}").matches(id) -> ValidacionEstacion.VERIFICADA
-    else -> ValidacionEstacion.PENDIENTE
+    id == null || rol == null -> ValidacionEstacion.PENDIENTE
+    else -> ValidacionEstacion.VERIFICADA
 }

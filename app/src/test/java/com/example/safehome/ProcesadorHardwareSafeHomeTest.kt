@@ -127,6 +127,67 @@ class ProcesadorHardwareSafeHomeTest {
         assertEquals(PortatilHardware.PRESENTE, estado.portatil)
         assertEquals(AlarmaHardware.NINGUNA, estado.alarma)
     }
+    @Test fun handshakeValidoVerificaEnAmbosOrdenesSoloAlCompletarIdentidad() {
+        val identidad = listOf("DEVICE" to "SH-E-001", "ROLE" to "STATION")
+        listOf(identidad, identidad.reversed()).forEach { mensajes ->
+            val inicial = EstadoHardwareSafeHome(conexion = ConexionEstacionIoT.CONECTADO_NO_VERIFICADO)
+            val primero = recibir(inicial, mensajes[0].first, mensajes[0].second)
+            assertEquals(ConexionEstacionIoT.CONECTADO_NO_VERIFICADO, primero.estado.conexion)
+            assertFalse(primero.estado.verificado)
+            assertFalse(primero.solicitarEstado)
+            val repetido = recibir(primero.estado, mensajes[0].first, mensajes[0].second)
+            assertFalse(repetido.estado.verificado)
+            assertFalse(repetido.solicitarEstado)
+            val completo = recibir(repetido.estado, mensajes[1].first, mensajes[1].second)
+            assertTrue(completo.estado.verificado)
+            assertTrue(completo.solicitarEstado)
+            assertEquals("SH-E-001", completo.estado.idDispositivo)
+            assertEquals("STATION", completo.estado.rolDispositivo)
+            assertFalse(recibir(completo.estado, mensajes[1].first, mensajes[1].second).solicitarEstado)
+        }
+    }
+    @Test fun deviceInvalidoRechazaAntesODespuesDeRoleYNoConsultaStatus() {
+        listOf("SH-E-", "SH-M-001", "SH-E-uno dos", "SH-E-${"A".repeat(65)}").forEach { id ->
+            val inicial = EstadoHardwareSafeHome(conexion = ConexionEstacionIoT.CONECTADO_NO_VERIFICADO)
+            val conRole = recibir(inicial, "ROLE", "STATION").estado
+            listOf(inicial, conRole).forEach { previo ->
+                val resultado = recibir(previo, "DEVICE", id)
+                assertEquals(ConexionEstacionIoT.ERROR, resultado.estado.conexion)
+                assertFalse(resultado.estado.verificado)
+                assertFalse(resultado.solicitarEstado)
+                assertNull(resultado.evento)
+                assertEquals(resultado.estado, recibir(resultado.estado, "ROLE", "STATION").estado)
+            }
+        }
+    }
+    @Test fun roleIncorrectoRechazaAntesODespuesDeDeviceYNoConsultaStatus() {
+        listOf("PORTABLE", "station", "UNKNOWN").forEach { rol ->
+            val inicial = EstadoHardwareSafeHome(conexion = ConexionEstacionIoT.CONECTADO_NO_VERIFICADO)
+            val conDevice = recibir(inicial, "DEVICE", "SH-E-001").estado
+            listOf(inicial, conDevice).forEach { previo ->
+                val resultado = recibir(previo, "ROLE", rol)
+                assertEquals(ConexionEstacionIoT.ERROR, resultado.estado.conexion)
+                assertFalse(resultado.estado.verificado)
+                assertFalse(resultado.solicitarEstado)
+                assertNull(resultado.evento)
+                assertEquals(resultado.estado, recibir(resultado.estado, "DEVICE", "SH-E-001").estado)
+            }
+        }
+    }
+    @Test fun deviceInvalidoRevocaVerificacionYEstadoFisicoPrevio() {
+        val resultado = recibir(apagando().copy(puerta = PuertaHardware.ABIERTA,
+            portatil = PortatilHardware.PRESENTE, alarma = AlarmaHardware.CRITICA), "DEVICE", "SH-M-001")
+        assertEquals(ConexionEstacionIoT.ERROR, resultado.estado.conexion)
+        assertFalse(resultado.estado.verificado)
+        assertNull(resultado.estado.operacion)
+        assertEquals(SistemaHardware.DESCONOCIDO, resultado.estado.sistema)
+        assertEquals(PuertaHardware.DESCONOCIDA, resultado.estado.puerta)
+        assertEquals(PortatilHardware.DESCONOCIDO, resultado.estado.portatil)
+        assertEquals(AlarmaHardware.DESCONOCIDA, resultado.estado.alarma)
+        assertFalse(resultado.solicitarEstado)
+        assertNull(resultado.evento)
+        assertNull(resultado.sistemaParaSincronizar)
+    }
     @Test fun eventYStateRepetidosGeneranSoloUnaTransicion() {
         var estado = verificado.copy(puerta = PuertaHardware.CERRADA)
         val eventos = mutableListOf<EventoFisico>()

@@ -77,21 +77,33 @@ class ProtocoloSafeHomeTest {
     }
 
     @Test fun handshakeAceptaSoloEstacionConIdValido() {
-        assertEquals(ValidacionEstacion.VERIFICADA, validarHandshakeEstacion("SH-E-001", "STATION"))
-        assertEquals(ValidacionEstacion.VERIFICADA, validarHandshakeEstacion("SH-E-xxx", "STATION"))
+        listOf("SH-E-001", "SH-E-xxx", "SH-E-A", "SH-E-aZ09_-", "SH-E-${"A".repeat(64)}").forEach { id ->
+            assertEquals(id, ValidacionEstacion.VERIFICADA, validarHandshakeEstacion(id, "STATION"))
+            assertEquals(id, ValidacionEstacion.PENDIENTE, validarHandshakeEstacion(id, null))
+        }
     }
 
-    @Test fun handshakeRechazaPortatilInclusoConIdDeEstacion() {
-        assertEquals(ValidacionEstacion.RECHAZADA, validarHandshakeEstacion("SH-E-001", "PORTABLE"))
-        assertEquals(ValidacionEstacion.RECHAZADA, validarHandshakeEstacion(null, "PORTABLE"))
+    @Test fun handshakeRechazaRolesIncorrectosInclusoSinDevice() {
+        listOf("PORTABLE", "MOBILE", "UNKNOWN", "station", "STATION ", " STATION", "", " ").forEach { rol ->
+            listOf(null, "SH-E-001").forEach { id ->
+                assertEquals("id=$id rol=$rol", ValidacionEstacion.RECHAZADA, validarHandshakeEstacion(id, rol))
+            }
+        }
     }
 
-    @Test fun handshakeEsperaAmbosCamposEnCualquierOrden() {
+    @Test fun handshakePendienteSoloConCamposAusentesYValoresPresentesValidos() {
         assertEquals(ValidacionEstacion.PENDIENTE, validarHandshakeEstacion(null, null))
         assertEquals(ValidacionEstacion.PENDIENTE, validarHandshakeEstacion("SH-E-001", null))
         assertEquals(ValidacionEstacion.PENDIENTE, validarHandshakeEstacion(null, "STATION"))
-        listOf("", "SH-E-", "SH-P-001", "SH-E-uno dos").forEach {
-            assertEquals(ValidacionEstacion.PENDIENTE, validarHandshakeEstacion(it, "STATION"))
+    }
+
+    @Test fun handshakeRechazaDeviceInvalidoInclusoSinRole() {
+        listOf("", " ", "SH-E-", "SH-P-001", "SH-M-001", "sh-e-001", "SH-E-uno dos",
+            " SH-E-001", "SH-E-001 ", "SH-E-á", "SH-E-a.b", "SH-E-a/b", "SH-E-a|b",
+            "SH-E-a\n", "SH-E-a\r", "SH-E-${"A".repeat(65)}").forEach { id ->
+            listOf(null, "STATION", "PORTABLE").forEach { rol ->
+                assertEquals("id=$id rol=$rol", ValidacionEstacion.RECHAZADA, validarHandshakeEstacion(id, rol))
+            }
         }
     }
 
