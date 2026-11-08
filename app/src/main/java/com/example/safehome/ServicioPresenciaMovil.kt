@@ -238,7 +238,7 @@ class ServicioPresenciaMovil : Service() {
     private fun textoNotificacion(estado: EstadoPresenciaServicio): String = when (estado) { EstadoPresenciaServicio.ACTIVA -> "Presencia activa"; EstadoPresenciaServicio.SIN_CONEXION -> "Esperando conexión"; EstadoPresenciaServicio.CONECTANDO -> "Restableciendo presencia"; EstadoPresenciaServicio.ERROR, EstadoPresenciaServicio.NO_DISPONIBLE -> "Restableciendo presencia" }
     private fun diagnosticar(etapa: String, error: Exception?) {
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) return
-        Log.d("SafeHomePresencia", "etapa=$etapa tipo=${error?.javaClass?.simpleName ?: "sin_error"} mensaje=${error?.message ?: "sin_mensaje"}")
+        Log.d("SafeHomePresencia", "etapa=$etapa tipo=${error?.javaClass?.simpleName ?: "sin_error"}")
     }
     companion object { const val EXTRA_UID = "uid"; const val EXTRA_HOGAR = "hogar"; private const val CANAL = "presencia"; private const val ID_NOTIFICACION = 41; private const val INTERVALO_LATIDO_MS = 30_000L; private const val ESPERA_WATCHDOG_RECUPERACION_MS = 15_000L; private const val PAUSA_GO_OFFLINE_MS = 1_000L; private const val PAUSA_REINSTALACION_LISTENER_MS = 500L; private val estadoInterno = MutableStateFlow(EstadoPresenciaServicio.NO_DISPONIBLE); val estado: StateFlow<EstadoPresenciaServicio> = estadoInterno }
 }

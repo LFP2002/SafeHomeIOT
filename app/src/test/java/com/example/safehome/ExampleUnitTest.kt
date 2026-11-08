@@ -450,6 +450,48 @@ class PerfilUsuarioTest {
     }
 
     @Test
+    fun latidosCadaTreintaSegundosNoRepitenAlertasTrasReconectarConDesfase() {
+        var seguimiento = decidirAlertaConexion(SeguimientoAlertaConexion(), EstadoVisualPresencia.ACTIVO).seguimiento
+        val desconexion = decidirAlertaConexion(seguimiento, EstadoVisualPresencia.DESCONECTADO)
+        assertTrue(desconexion.debeAlertarDesconexion)
+        seguimiento = desconexion.seguimiento
+
+        repeat(6) { indice ->
+            val timestamp = 100_000L + indice * 30_000L
+            val presencia = EstadoPresenciaMovilUi.Valida(PresenciaMovil(true, 100_000L, timestamp))
+            // Recepción del latido con reloj atrasado, seguida por las revisiones de la estación.
+            listOf(-200L, 4_800L, 9_800L, 14_800L, 19_800L, 24_800L).forEachIndexed { revision, edad ->
+                val visual = estadoVisualPresencia(presencia, timestamp + edad)
+                assertEquals(EstadoVisualPresencia.ACTIVO, visual)
+                val decision = decidirAlertaConexion(seguimiento, visual)
+                assertFalse(decision.debeAlertarDesconexion)
+                assertEquals(indice == 0 && revision == 0, decision.debeCancelarPorReconexión)
+                seguimiento = decision.seguimiento
+            }
+        }
+
+        val ultimoLatido = 250_000L
+        val vencida = EstadoPresenciaMovilUi.Valida(PresenciaMovil(true, 100_000L, ultimoLatido))
+        val desconexionReal = decidirAlertaConexion(seguimiento, estadoVisualPresencia(vencida, ultimoLatido + 75_001L))
+        assertTrue(desconexionReal.debeAlertarDesconexion)
+        val repetida = decidirAlertaConexion(desconexionReal.seguimiento, estadoVisualPresencia(vencida, ultimoLatido + 80_000L))
+        assertFalse(repetida.debeAlertarDesconexion)
+        val recuperada = EstadoPresenciaMovilUi.Valida(PresenciaMovil(true, 340_000L, 340_000L))
+        assertTrue(decidirAlertaConexion(repetida.seguimiento, estadoVisualPresencia(recuperada, 339_800L)).debeCancelarPorReconexión)
+    }
+
+    @Test
+    fun toleranciaDeRelojEsAcotadaYRespetaDesconexionExplicita() {
+        val presencia = EstadoPresenciaMovilUi.Valida(PresenciaMovil(true, 100_000L, 100_000L))
+        assertEquals(EstadoVisualPresencia.ACTIVO, estadoVisualPresencia(presencia, 95_000L))
+        assertEquals(EstadoVisualPresencia.DESCONECTADO, estadoVisualPresencia(presencia, 94_999L))
+        assertEquals(EstadoVisualPresencia.ACTIVO, estadoVisualPresencia(presencia, 175_000L))
+        assertEquals(EstadoVisualPresencia.DESCONECTADO, estadoVisualPresencia(presencia, 175_001L))
+        val desconectada = EstadoPresenciaMovilUi.Valida(presencia.presencia.copy(conectado = false))
+        assertEquals(EstadoVisualPresencia.DESCONECTADO, estadoVisualPresencia(desconectada, 99_800L))
+    }
+
+    @Test
     fun relojLocalReclasificaSinNuevoDatoRtdb() {
         val presencia = EstadoPresenciaMovilUi.Valida(PresenciaMovil(true, 1L, 10_000L))
         assertEquals(EstadoVisualPresencia.ACTIVO, estadoVisualPresencia(presencia, 85_000L))

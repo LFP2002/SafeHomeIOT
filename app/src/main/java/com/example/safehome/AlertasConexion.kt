@@ -85,6 +85,11 @@ class NotificadorAlertasConexion(context: Context) {
         }
     }
 
+    fun olvidar(uid: String) {
+        seguimientoPorMovil.remove(uid)
+        contexto.getSystemService(NotificationManager::class.java).cancel(idNotificacion(uid))
+    }
+
     fun reiniciar() {
         seguimientoPorMovil.keys.forEach { contexto.getSystemService(NotificationManager::class.java).cancel(idNotificacion(it)) }
         seguimientoPorMovil.clear()

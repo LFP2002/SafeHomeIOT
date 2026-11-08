@@ -28,6 +28,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 private const val MAXIMO_CORREO = 254
@@ -252,8 +254,79 @@ fun estadoTrasErrorEliminacion(mensaje: String): EstadoSesionUi = EstadoSesionUi
 )
 
 class ControlSesion(application: Application) : AndroidViewModel(application) {
+    private val enlacePortatil = EnlaceUsbPortatil(application)
+    val estadoHardwarePortatil: StateFlow<EstadoHardwarePortatil> = enlacePortatil.estado
+    private val listenerSesionUsb = FirebaseAuth.AuthStateListener { enlacePortatil.finalizarSesion() }
+
+    private fun puedeUsarUsbPortatil(): Boolean = auth.currentUser != null &&
+        (_estado.value.perfil as? EstadoPerfilUi.Valido)?.perfil?.rol?.esMovil() == true
+
+    fun listarDispositivosUsb() {
+        if (puedeUsarUsbPortatil()) enlacePortatil.listarDispositivos()
+    }
+
+    fun solicitarConexionPortatil(clave: String) {
+        if (puedeUsarUsbPortatil()) enlacePortatil.solicitarConexion(clave)
+    }
+
+    fun desconectarPortatil() = enlacePortatil.desconectar()
+
+    fun probarConexionPortatil() {
+        if (puedeUsarUsbPortatil()) enlacePortatil.probarComunicacion()
+    }
+
+    fun actualizarEstadoPortatil() {
+        if (puedeUsarUsbPortatil()) enlacePortatil.actualizarEstado()
+    }
+
+    private val enlaceEstacion = EnlaceBluetoothEstacion(application)
+    val estadoHardwareEstacion: StateFlow<EstadoHardwareSafeHome> = enlaceEstacion.estado
+    private val listenerSesionBluetooth = FirebaseAuth.AuthStateListener {
+        enlaceEstacion.desconectar(olvidarDispositivo = true)
+    }
+
+    private fun puedeUsarBluetoothEstacion(): Boolean = auth.currentUser != null &&
+        (_estado.value.perfil as? EstadoPerfilUi.Valido)?.perfil?.rol?.esEstacion() == true
+
+    fun obtenerDispositivosBluetoothVinculados() {
+        if (puedeUsarBluetoothEstacion()) enlaceEstacion.obtenerDispositivosEmparejados()
+    }
+
+    fun conectarEstacionIoT(direccion: String) {
+        if (puedeUsarBluetoothEstacion()) enlaceEstacion.conectar(direccion)
+    }
+
+    fun desconectarEstacionIoT() = enlaceEstacion.desconectar()
+
+    fun probarConexionEstacionIoT() {
+        if (puedeUsarBluetoothEstacion()) enlaceEstacion.probarComunicacion()
+    }
+
+    fun encenderSistemaIoT() {
+        if (puedeUsarBluetoothEstacion() && escrituraActiva == null && envioComandoActivo == null) enlaceEstacion.encenderSistemaIoT()
+    }
+
+    fun apagarSistemaIoT() {
+        if (puedeUsarBluetoothEstacion() && escrituraActiva == null && envioComandoActivo == null) enlaceEstacion.apagarSistemaIoT()
+    }
+
+    fun reconocerAlarmaIoT() {
+        if (puedeUsarBluetoothEstacion() && escrituraActiva == null && envioComandoActivo == null) enlaceEstacion.reconocerAlarmaIoT()
+    }
+
+    fun solicitarEstadoIoT() {
+        if (puedeUsarBluetoothEstacion()) enlaceEstacion.solicitarEstadoIoT()
+    }
+
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
+    private val gestorHistorialHardware = GestorHistorialHardware(application, firestore)
+    val estadoSincronizacionHardware: StateFlow<EstadoSincronizacionHardware> = gestorHistorialHardware.estado
+    private val listenerSesionHistorial = FirebaseAuth.AuthStateListener { gestorHistorialHardware.establecerHogar(null) }
+
+    fun reintentarHistorialHardware(manual: Boolean = false) {
+        if (puedeUsarBluetoothEstacion()) gestorHistorialHardware.solicitar(manual)
+    }
     private val realtimeDatabase = FirebaseDatabase.getInstance()
     private data class SolicitudActiva(val id: Long, val timeout: Job)
     private data class LecturaPerfilActiva(
@@ -362,6 +435,7 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
     private var listenerConexionMovil: ValueEventListener? = null
     private var listenerDesfaseServidor: ValueEventListener? = null
     private var tickerPresenciaEstacion: Job? = null
+    private var observacionSupervision: Job? = null
     private val ultimoVisualPresencia = mutableMapOf<String, EstadoVisualPresencia>()
     private var referenciaConexionMovil: DatabaseReference? = null
     private var publicacionPresenciaActiva: PublicacionPresenciaActiva? = null
@@ -374,7 +448,37 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
     private var operacionCuentaActiva: OperacionCuentaActiva? = null
 
     init {
+        auth.addAuthStateListener(listenerSesionHistorial)
+        auth.addAuthStateListener(listenerSesionUsb)
+        viewModelScope.launch {
+            estado.map { (it.perfil as? EstadoPerfilUi.Valido)?.perfil?.takeIf { perfil -> perfil.rol.esMovil() }?.hogarId }
+                .distinctUntilChanged().collect { enlacePortatil.finalizarSesion() }
+        }
+        auth.addAuthStateListener(listenerSesionBluetooth)
+        viewModelScope.launch {
+            estado.map { (it.perfil as? EstadoPerfilUi.Valido)?.perfil?.takeIf { perfil -> perfil.rol.esEstacion() }?.hogarId }
+                .distinctUntilChanged().collect {
+                    enlaceEstacion.desconectar(olvidarDispositivo = true)
+                    gestorHistorialHardware.establecerHogar(it)
+                }
+        }
         auth.currentUser?.uid?.let { iniciarConsultaPerfil(it) }
+        viewModelScope.launch {
+            val sincronizador = SincronizadorHardwareHogar(firestore, gestorHistorialHardware, viewModelScope)
+            enlaceEstacion.cambiosConfirmados.collect { cambio ->
+                val perfil = (_estado.value.perfil as? EstadoPerfilUi.Valido)?.perfil
+                val uid = auth.currentUser?.uid
+                val sesion = sesionActual
+                if (perfil != null && perfil.rol.esEstacion() && uid != null && enlaceEstacion.contextoVigente(cambio.generacion)) {
+                    fun vigente() = enlaceEstacion.contextoVigente(cambio.generacion) && auth.currentUser?.uid == uid &&
+                        sesionActual == sesion && (_estado.value.perfil as? EstadoPerfilUi.Valido)?.perfil == perfil
+                    val error = sincronizador.registrar(perfil.hogarId, cambio, ::vigente) {
+                        if (vigente()) enlaceEstacion.informarSincronizacion(cambio.generacion, it)
+                    }
+                    if (vigente()) enlaceEstacion.informarSincronizacion(cambio.generacion, error)
+                }
+            }
+        }
     }
 
     fun iniciarSesion(correo: String, clave: String): ErroresFormulario {
@@ -613,6 +717,7 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
 
     private fun sincronizarPresenciasEstacion(perfil: PerfilUsuario, vinculados: Set<String>) {
         if (!perfil.rol.esEstacion()) return
+        iniciarSupervisionEstacion()
         if (listenerDesfaseServidor == null) {
             listenerDesfaseServidor = object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) { (snapshot.value as? Long)?.let { _estado.value = _estado.value.copy(desfaseHoraServidor = it) } }
@@ -668,8 +773,8 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
                         val visual = estadoVisualPresencia(estadoPresencia, horaServidor)
                         val anterior = ultimoVisualPresencia.put(uidMovil, visual)
                         val presenciaValida = (estadoPresencia as? EstadoPresenciaMovilUi.Valida)?.presencia
-                        val edadSegundos = presenciaValida?.let { ((horaServidor - it.ultimoLatido).coerceAtLeast(0L) / 1_000L) }
-                        registrarPresenciaEstacion("estacion_ticker_tick", "válido=${presenciaValida != null} previo=${anterior ?: "ninguno"} calculado=$visual edadSegundos=${edadSegundos ?: "n/a"}")
+                        val edadMs = presenciaValida?.let { horaServidor - it.ultimoLatido }
+                        registrarPresenciaEstacion("estacion_ticker_tick", "válido=${presenciaValida != null} previo=${anterior ?: "ninguno"} calculado=$visual edadMs=${edadMs ?: "n/a"}")
                         if (anterior != null && anterior != visual && visual in setOf(EstadoVisualPresencia.ACTIVO, EstadoVisualPresencia.DESCONECTADO)) {
                             val presencia = presenciaValida ?: return@forEach
                             registrarPresenciaEstacion(if (visual == EstadoVisualPresencia.ACTIVO) "estacion_reclasificacion_activo" else "estacion_reclasificacion_desconectado", "transición")
@@ -690,7 +795,7 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
             PresenciaMovilUi(movil.uidMovil, movil.nombre, estadoVisualPresencia(_estado.value.presenciasMoviles[movil.uidMovil], horaServidor))
         }
         _estado.value = _estado.value.copy(presenciasUi = ui)
-        ui.forEach(notificadorAlertasConexion::procesar)
+        // Las alertas pertenecen al servicio, también cuando esta pantalla no existe.
         registrarPresenciaEstacion("estacion_ui_publicada", "aprobados=${aprobados.size} entradas=${ui.size} estados=${ui.joinToString { it.estadoFinal.name }}")
     }
 
@@ -715,7 +820,39 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
         Log.d("SafeHomePresencia", "etapa=$etapa $detalle")
     }
 
-    private fun invalidarPresencia(sinPublicar: Boolean = false) {
+    fun iniciarSupervisionEstacion() {
+        val perfil = (_estado.value.perfil as? EstadoPerfilUi.Valido)?.perfil ?: return
+        if (!perfil.rol.esEstacion()) return
+        val uid = auth.currentUser?.uid ?: return
+        try {
+            getApplication<Application>().startForegroundService(
+                Intent(getApplication(), ServicioSupervisionEstacion::class.java)
+                    .putExtra(ServicioSupervisionEstacion.EXTRA_UID, uid)
+                    .putExtra(ServicioSupervisionEstacion.EXTRA_HOGAR, perfil.hogarId)
+            )
+        } catch (error: Exception) {
+            Log.e("SafeHomeSupervision", "No se pudo iniciar la supervisión de la estación tipo=${error.javaClass.simpleName}")
+            return
+        }
+        if (observacionSupervision == null) observacionSupervision = viewModelScope.launch {
+            ServicioSupervisionEstacion.estado.collect { supervision ->
+                val actual = (_estado.value.perfil as? EstadoPerfilUi.Valido)?.perfil
+                if (actual?.rol?.esEstacion() == true && actual.hogarId == supervision.hogarId &&
+                    auth.currentUser?.uid == supervision.uid) {
+                    _estado.value = _estado.value.copy(
+                        presenciasMoviles = supervision.presencias,
+                        presenciasUi = supervision.ui,
+                        desfaseHoraServidor = supervision.desfase
+                    )
+                }
+            }
+        }
+    }
+
+    private fun invalidarPresencia(sinPublicar: Boolean = false, detenerSupervision: Boolean = true) {
+        observacionSupervision?.cancel()
+        observacionSupervision = null
+        if (detenerSupervision) getApplication<Application>().stopService(Intent(getApplication(), ServicioSupervisionEstacion::class.java))
         val perfil = (_estado.value.perfil as? EstadoPerfilUi.Valido)?.perfil
         val uid = auth.currentUser?.uid
         if (!sinPublicar && perfil?.rol == RolUsuario.MOVIL && uid != null) {
@@ -732,7 +869,6 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
         tickerPresenciaEstacion = null
         registrarPresenciaEstacion("estacion_ticker_detener", "contexto invalidado")
         ultimoVisualPresencia.clear()
-        notificadorAlertasConexion.reiniciar()
         _estado.value = _estado.value.copy(presenciasUi = emptyList())
         publicacionPresenciaActiva = null
         generacionPresencia++
@@ -1085,7 +1221,7 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
     private fun registrarFalloVinculacion(etapa: String, error: Exception?) {
         if (getApplication<Application>().applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) return
         val firestoreError = error as? FirebaseFirestoreException
-        Log.e("SafeHomeVinculacion", "etapa=$etapa tipo=${error?.javaClass?.simpleName ?: "sin_excepcion"} codigo=${firestoreError?.code ?: "sin_codigo"} mensaje=${error?.message ?: "sin_mensaje"}")
+        Log.e("SafeHomeVinculacion", "etapa=$etapa tipo=${error?.javaClass?.simpleName ?: "sin_excepcion"} codigo=${firestoreError?.code ?: "sin_codigo"}")
     }
 
     fun recuperarContrasena(correo: String): String? {
@@ -1272,6 +1408,7 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
         iniciarListenerEstado(perfil)
         iniciarListenerConfiguracion(perfil)
         if (perfil.rol.esEstacion()) {
+            iniciarSupervisionEstacion()
             iniciarListenerComando(perfil)
             iniciarLecturaCodigoVinculacion(perfil)
         }
@@ -1786,7 +1923,7 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
     private fun registrarDatos(etapa: String, resultado: String, error: Exception?) {
         if (getApplication<Application>().applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) return
         val firestoreError = error as? FirebaseFirestoreException
-        Log.e("SafeHomeDatos", "etapa=$etapa resultado=$resultado tipo=${error?.javaClass?.simpleName ?: "sin_excepcion"} codigo=${firestoreError?.code ?: "sin_codigo"} mensaje=${error?.message ?: "sin_mensaje"}")
+        Log.e("SafeHomeDatos", "etapa=$etapa resultado=$resultado tipo=${error?.javaClass?.simpleName ?: "sin_excepcion"} codigo=${firestoreError?.code ?: "sin_codigo"}")
     }
 
     private fun invalidarLecturaHistorial() {
@@ -1804,6 +1941,10 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
     }
 
     fun cambiarSistema(sistemaActivo: Boolean) {
+        if (puedeUsarBluetoothEstacion() && estadoHardwareEstacion.value.verificado) {
+            if (sistemaActivo) encenderSistemaIoT() else apagarSistemaIoT()
+            return
+        }
         if (escrituraActiva != null || envioComandoActivo != null) return
         val perfil = (_estado.value.perfil as? EstadoPerfilUi.Valido)?.perfil ?: return
         val configuracion = (_estado.value.configuracion as? EstadoConfiguracionHogarUi.Valida)?.configuracion ?: return
@@ -1863,6 +2004,10 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
     }
 
     fun enviarReconocimientoAlerta() {
+        if (puedeUsarBluetoothEstacion() && estadoHardwareEstacion.value.verificado) {
+            reconocerAlarmaIoT()
+            return
+        }
         if (envioComandoActivo != null || escrituraActiva != null) return
         val perfil = (_estado.value.perfil as? EstadoPerfilUi.Valido)?.perfil ?: return
         val estadoConfirmado = (_estado.value.hogar as? EstadoHogarUi.Valido)?.estado ?: return
@@ -2069,6 +2214,7 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
         notificadorAlertas.reiniciarSesion()
         solicitudPermisoMostrada = false
         sesionActual++
+        enlaceEstacion.desconectar(olvidarDispositivo = true)
         auth.signOut()
         _estado.value = estadoTrasCuentaEliminada()
         registrarEliminacion("estado_exito_publicado", true)
@@ -2091,6 +2237,9 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
         if (solicitudActiva != null) return
         val lectura = lecturaPerfilActiva
         if (lectura != null && !lectura.expirada) return
+        gestorHistorialHardware.establecerHogar(null)
+        enlacePortatil.finalizarSesion()
+        enlaceEstacion.desconectar(olvidarDispositivo = true)
         lectura?.timeout?.cancel()
         lecturaPerfilActiva = null
         eliminarListenerEstado()
@@ -2111,12 +2260,18 @@ class ControlSesion(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        auth.removeAuthStateListener(listenerSesionHistorial)
+        gestorHistorialHardware.cerrar()
+        auth.removeAuthStateListener(listenerSesionUsb)
+        enlacePortatil.cerrar()
+        auth.removeAuthStateListener(listenerSesionBluetooth)
+        enlaceEstacion.cerrar()
         registroEstacionActivo?.timeout?.cancel()
         registroEstacionActivo = null
         lecturaCodigoVinculacionActiva = null
         eliminarListenerEstado()
         eliminarListenerConfiguracion()
-        invalidarPresencia()
+        invalidarPresencia(detenerSupervision = false)
         invalidarLecturaMoviles()
         invalidarEscritura()
         eliminarListenerComando()

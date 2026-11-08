@@ -8,6 +8,11 @@ import androidx.lifecycle.ViewModelProvider
 import com.example.safehome.ui.theme.SafeHomeTheme
 
 class MainActivity : ComponentActivity() {
+    override fun onStart() {
+        super.onStart()
+        ViewModelProvider(this)[ControlSesion::class.java].iniciarSupervisionEstacion()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

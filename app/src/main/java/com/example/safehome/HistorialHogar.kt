@@ -13,6 +13,7 @@ sealed interface EventoHistorial {
     data class SistemaActualizado(val sistemaActivo: Boolean, override val horaLocal: String) : EventoHistorial
 
     data class PresenciaMovilActualizada(val nombre: String, val conectado: Boolean, override val horaLocal: String) : EventoHistorial
+    data class Fisico(val tipo: EventoFisico, override val horaLocal: String) : EventoHistorial
 }
 
 sealed interface ResultadoEventoHistorial {
@@ -36,6 +37,14 @@ fun seleccionarPaginaHistorial(eventosLeidos: List<EventoHistorial>): PaginaHist
 fun puedeIrPaginaAnterior(pagina: Int): Boolean = pagina > 0
 
 fun validarEventoHistorial(datos: Map<String, Any?>): ResultadoEventoHistorial {
+    if ("ocurridoEnMillis" in datos || "sincronizadoEn" in datos) {
+        val ocurrido = datos["ocurridoEnMillis"] as? Long ?: return ResultadoEventoHistorial.Invalido
+        if (ocurrido !in 1..253402300799999L || datos["sincronizadoEn"] !is Timestamp ||
+            EventoFisico.entries.none { it.name == datos["tipo"] } || datos["creadoEn"] !is Timestamp) return ResultadoEventoHistorial.Invalido
+        // Los antiguos conservan creadoEn. Los nuevos muestran ocurrencia, no hora de subida.
+        return validarEventoHistorial((datos - setOf("ocurridoEnMillis", "sincronizadoEn")) +
+            ("creadoEn" to Timestamp(java.util.Date(ocurrido))))
+    }
     val hora = formatearHoraLocal(datos["creadoEn"] as? Timestamp ?: return ResultadoEventoHistorial.Invalido)
         ?: return ResultadoEventoHistorial.Invalido
     return when (datos["tipo"]) {
@@ -61,7 +70,12 @@ fun validarEventoHistorial(datos: Map<String, Any?>): ResultadoEventoHistorial {
             if (validarNombreVisible(nombre) != null) ResultadoEventoHistorial.Invalido
             else ResultadoEventoHistorial.Valido(EventoHistorial.PresenciaMovilActualizada(nombre, datos["tipo"] == "MOVIL_CONECTADO", hora))
         }
-        else -> ResultadoEventoHistorial.Invalido
+        else -> {
+            val tipo = EventoFisico.entries.find { it.name == datos["tipo"] }
+                ?: return ResultadoEventoHistorial.Invalido
+            if (datos.keys != setOf("tipo", "creadoEn")) ResultadoEventoHistorial.Invalido
+            else ResultadoEventoHistorial.Valido(EventoHistorial.Fisico(tipo, hora))
+        }
     }
 }
 
@@ -70,7 +84,16 @@ fun textoEventoHistorial(evento: EventoHistorial): List<String> = when (evento) 
     is EventoHistorial.ReconocimientoSolicitado -> listOf("Solicitud de reconocimiento enviada")
     is EventoHistorial.SistemaActualizado -> listOf(if (evento.sistemaActivo) "Sistema activado" else "Sistema desactivado")
     is EventoHistorial.PresenciaMovilActualizada -> listOf(evento.nombre, if (evento.conectado) "Móvil conectado" else "Móvil desconectado")
+    is EventoHistorial.Fisico -> listOf(evento.tipo.texto)
 }
+
+/** Conserva exactamente el formato histórico de los eventos SYSTEM. */
+fun datosEventoFisico(tipo: EventoFisico, creadoEn: Any): Map<String, Any> =
+    mapOf("tipo" to tipo.name, "creadoEn" to creadoEn) + when (tipo) {
+        EventoFisico.SISTEMA_ACTIVADO -> mapOf("sistemaActivo" to true)
+        EventoFisico.SISTEMA_DESACTIVADO -> mapOf("sistemaActivo" to false)
+        else -> emptyMap()
+    }
 
 fun respuestaHistorialEsVigente(
     idActivo: Long,

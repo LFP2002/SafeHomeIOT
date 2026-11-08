@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 const val TIEMPO_MAXIMO_SIN_LATIDO_MS = 75_000L
+const val TOLERANCIA_DESFASE_PRESENCIA_MS = 5_000L
 
 /** Presencia validada; no representa conectividad hasta una futura lectura confirmada. */
 data class PresenciaMovil(
@@ -76,7 +77,9 @@ fun clasificarPresenciaMovil(datos: Any?): EstadoPresenciaMovilUi = when (val re
 fun estadoVisualPresencia(estado: EstadoPresenciaMovilUi?, horaServidorActual: Long? = null): EstadoVisualPresencia = when (estado) {
     is EstadoPresenciaMovilUi.Valida -> {
         val edad = (horaServidorActual ?: estado.presencia.ultimoLatido) - estado.presencia.ultimoLatido
-        if (estado.presencia.conectado && edad in 0..TIEMPO_MAXIMO_SIN_LATIDO_MS) EstadoVisualPresencia.ACTIVO else EstadoVisualPresencia.DESCONECTADO
+        // La hora estimada de la estación puede quedar ligeramente detrás del timestamp de Firebase.
+        // Toleramos ese desfase sin aceptar timestamps arbitrariamente futuros.
+        if (estado.presencia.conectado && edad in -TOLERANCIA_DESFASE_PRESENCIA_MS..TIEMPO_MAXIMO_SIN_LATIDO_MS) EstadoVisualPresencia.ACTIVO else EstadoVisualPresencia.DESCONECTADO
     }
     is EstadoPresenciaMovilUi.Error -> EstadoVisualPresencia.ERROR
     EstadoPresenciaMovilUi.Cargando, EstadoPresenciaMovilUi.NoDisponible, null -> EstadoVisualPresencia.SIN_DATOS

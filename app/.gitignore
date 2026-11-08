@@ -1,0 +1,3 @@
+# Defensa local del módulo; las reglas generales están en ../.gitignore.
+/build/
+/google-services.json

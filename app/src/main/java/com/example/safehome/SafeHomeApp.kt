@@ -43,6 +43,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -88,11 +92,20 @@ import com.example.safehome.ui.theme.SafeHomeWarning
 
 @Composable
 fun SafeHomeApp(controlSesion: ControlSesion) {
+    val cicloHistorial = LocalLifecycleOwner.current
+    DisposableEffect(cicloHistorial, controlSesion) {
+        val observador = LifecycleEventObserver { _, evento ->
+            if (evento == Lifecycle.Event.ON_RESUME) controlSesion.reintentarHistorialHardware()
+        }
+        cicloHistorial.lifecycle.addObserver(observador)
+        onDispose { cicloHistorial.lifecycle.removeObserver(observador) }
+    }
     var mostrarLogin by rememberSaveable { mutableStateOf(false) }
     var mostrarRegistro by rememberSaveable { mutableStateOf(false) }
     var mostrarRegistroMovil by rememberSaveable { mutableStateOf(false) }
     var reinicioFormulario by rememberSaveable { mutableStateOf(0) }
     val estado by controlSesion.estado.collectAsState()
+    val hardwareEstacion by controlSesion.estadoHardwareEstacion.collectAsState()
     val presenciaServicio by ServicioPresenciaMovil.estado.collectAsState()
     val lanzadorPermisoNotificaciones = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -116,6 +129,9 @@ fun SafeHomeApp(controlSesion: ControlSesion) {
                 onEliminar = controlSesion::eliminarCuentaMovilDesvinculado,
                 onCerrarSesion = { controlSesion.cerrarSesion(); reinicioFormulario++; mostrarLogin = true }
             ) else PantallaPerfilValido(
+                estacionIoT = { TarjetaEstacionIoT(controlSesion) },
+                portatilUsb = { TarjetaDispositivoPortatil(controlSesion) },
+                hardwareVerificado = hardwareEstacion.verificado,
                 perfil = perfil,
                 estadoHogar = estado.hogar ?: EstadoHogarUi.Cargando,
                 configuracion = estado.configuracion ?: EstadoConfiguracionHogarUi.Cargando,
@@ -580,6 +596,9 @@ private fun PantallaMovilDesvinculado(
 
 @Composable
 private fun PantallaPerfilValido(
+    estacionIoT: @Composable () -> Unit,
+    portatilUsb: @Composable () -> Unit,
+    hardwareVerificado: Boolean,
     perfil: PerfilUsuario,
     estadoHogar: EstadoHogarUi,
     configuracion: EstadoConfiguracionHogarUi,
@@ -636,18 +655,19 @@ private fun PantallaPerfilValido(
             }
         }
     ) { paddingValores ->
-        DashboardSurface(modifier = Modifier.padding(paddingValores), conDesplazamiento = !(simulador || esMovil)) {
+        DashboardSurface(modifier = Modifier.padding(paddingValores), conDesplazamiento = !(simulador || esMovil) || (simulador && seccion == SeccionPanel.PANEL) || (esMovil && seccion == SeccionPanel.INICIO)) {
             when (seccion) {
                 SeccionPanel.INICIO -> {
                     if (simulador) {
                         PanelInicioSimulador(perfil, nombreHogar, if (estadoHogar is EstadoHogarUi.Valido) "Disponible" else "No disponible", configuracion, listaMoviles, historial)
                     } else if (esMovil) {
                         PanelInicioMovil(perfil, nombreHogar, presenciaPropia)
+                        portatilUsb()
                     } else {
                         PanelInicioCuidador(estadoHogar, perfil, correoCuenta, nombreHogar) { seccion = SeccionPanel.PANEL }
                     }
                 }
-                SeccionPanel.PANEL -> if (simulador) PanelSimulador(configuracion, escritura, onReintentarConfiguracion, { sistemaPorConfirmar = it }, listaMoviles, presenciasUi, onCargarMoviles, onDesvincularMovil, operacionMovil) else if (perfil.rol == RolUsuario.MOVIL) PanelMonitoreoMovil(presenciaPropia) else PanelMonitoreoCuidador(estadoHogar, configuracion, estadoConfirmado, envioComando, onReintentar, onReintentarConfiguracion, onReconocerAlerta)
+                SeccionPanel.PANEL -> if (simulador) PanelSimulador(configuracion, escritura, onReintentarConfiguracion, { sistemaPorConfirmar = it }, listaMoviles, presenciasUi, onCargarMoviles, onDesvincularMovil, operacionMovil, hardwareVerificado, estacionIoT) else if (perfil.rol == RolUsuario.MOVIL) PanelMonitoreoMovil(presenciaPropia) else PanelMonitoreoCuidador(estadoHogar, configuracion, estadoConfirmado, envioComando, onReintentar, onReintentarConfiguracion, onReconocerAlerta)
                 SeccionPanel.HISTORIAL -> PantallaActividad(
                     historial ?: EstadoHistorialUi.Cargando(0), onActualizarHistorial, onPaginaAnterior, onPaginaSiguiente
                 )
@@ -852,44 +872,190 @@ private fun PanelSimulador(
     presencias: List<PresenciaMovilUi>,
     onCargarMoviles: () -> Unit,
     onDesvincular: (String) -> Unit,
-    operacion: EstadoOperacionMovilUi
+    operacion: EstadoOperacionMovilUi,
+    hardwareVerificado: Boolean,
+    estacionIoT: @Composable () -> Unit
 ) {
     EncabezadoVista("ESTACIÓN", "Panel", "Administra el sistema y los móviles vinculados.")
-    val sistemaActivo = (configuracion as? EstadoConfiguracionHogarUi.Valida)?.configuracion?.sistemaActivo
-    WhiteCard(containerColor = Color.White) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(Modifier.size(70.dp).background(when (sistemaActivo) {
-                true -> SafeHomeSuccess
-                false -> SafeHomeMuted.copy(alpha = 0.2f)
-                null -> SafeHomeLilac
-            }, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Estado del sistema", tint = if (sistemaActivo == false) SafeHomeMuted else Color.White, modifier = Modifier.size(34.dp))
+    if (!hardwareVerificado) {
+        val sistemaActivo = (configuracion as? EstadoConfiguracionHogarUi.Valida)?.configuracion?.sistemaActivo
+        WhiteCard(titulo = "Configuración del hogar · modo compatible", containerColor = Color.White) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(Modifier.size(70.dp).background(when (sistemaActivo) {
+                    true -> SafeHomeSuccess
+                    false -> SafeHomeMuted.copy(alpha = 0.2f)
+                    null -> SafeHomeLilac
+                }, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Estado del sistema", tint = if (sistemaActivo == false) SafeHomeMuted else Color.White, modifier = Modifier.size(34.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(when (sistemaActivo) {
+                        true -> "Configuración activada"
+                        false -> "Configuración desactivada"
+                        null -> "Estado sin verificar"
+                    }, style = MaterialTheme.typography.titleLarge)
+                    Text(when (sistemaActivo) {
+                        true -> "El sistema está habilitado en la configuración del hogar."
+                        false -> "El sistema está deshabilitado en la configuración del hogar."
+                        null -> "Esperando la configuración del hogar."
+                    }, color = SafeHomeMuted)
+                }
             }
-            Column(Modifier.weight(1f)) {
-                Text(when (sistemaActivo) {
-                    true -> "Sistema activo"
-                    false -> "Sistema apagado"
-                    null -> "Estado sin verificar"
-                }, style = MaterialTheme.typography.titleLarge)
-                Text(when (sistemaActivo) {
-                    true -> "La estación está funcionando correctamente."
-                    false -> "La generación de alertas está suspendida."
-                    null -> "Esperando la confirmación del sistema."
-                }, color = SafeHomeMuted)
-            }
+            Text("Sin Estación IoT verificada, esta configuración no confirma el estado físico.", color = SafeHomeMuted)
+        }
+        EstadoConfiguracionSistema(configuracion, onReintentarConfiguracion)
+        if (configuracion is EstadoConfiguracionHogarUi.Valida) {
+            BotonSecundario(if (sistemaActivo == true) "Apagar sistema" else "Encender sistema", onClick = { onCambiarSistema(sistemaActivo != true) })
+        }
+        when (escritura) {
+            EstadoEscrituraUi.Aplicando -> MensajeOperacion("Aplicando cambio…", SafeHomeMuted)
+            EstadoEscrituraUi.EsperaAgotada -> MensajeOperacion("No se pudo confirmar el cambio. Puedes cerrar sesión mientras termina la operación.", SafeHomeCritical)
+            is EstadoEscrituraUi.Error -> MensajeOperacion(escritura.mensaje, SafeHomeCritical)
+            EstadoEscrituraUi.Inactiva -> Unit
         }
     }
-    EstadoConfiguracionSistema(configuracion, onReintentarConfiguracion)
-    if (configuracion is EstadoConfiguracionHogarUi.Valida) {
-        BotonSecundario(if (sistemaActivo == true) "Apagar sistema" else "Encender sistema", onClick = { onCambiarSistema(sistemaActivo != true) })
-    }
-    when (escritura) {
-        EstadoEscrituraUi.Aplicando -> MensajeOperacion("Aplicando cambio…", SafeHomeMuted)
-        EstadoEscrituraUi.EsperaAgotada -> MensajeOperacion("No se pudo confirmar el cambio. Puedes cerrar sesión mientras termina la operación.", SafeHomeCritical)
-        is EstadoEscrituraUi.Error -> MensajeOperacion(escritura.mensaje, SafeHomeCritical)
-        EstadoEscrituraUi.Inactiva -> Unit
-    }
+    estacionIoT()
     PanelMoviles(moviles, presencias, onCargarMoviles, onDesvincular, operacion)
+}
+
+@Composable
+private fun TarjetaEstacionIoT(controlSesion: ControlSesion) {
+    val sincronizacion by controlSesion.estadoSincronizacionHardware.collectAsState()
+    val hardware by controlSesion.estadoHardwareEstacion.collectAsState()
+    val sesion by controlSesion.estado.collectAsState()
+    var mostrarSelector by remember { mutableStateOf(false) }
+    var seleccion by remember { mutableStateOf<String?>(null) }
+    val direccion = seleccion ?: hardware.direccionBluetooth
+    val propietario = LocalLifecycleOwner.current
+    val permiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        controlSesion.obtenerDispositivosBluetoothVinculados()
+    }
+    DisposableEffect(propietario, controlSesion) {
+        val observador = LifecycleEventObserver { _, evento ->
+            if (evento == Lifecycle.Event.ON_RESUME) controlSesion.obtenerDispositivosBluetoothVinculados()
+        }
+        propietario.lifecycle.addObserver(observador)
+        controlSesion.obtenerDispositivosBluetoothVinculados()
+        onDispose { propietario.lifecycle.removeObserver(observador) }
+    }
+    val ocupado = hardware.conectado || hardware.conexion == ConexionEstacionIoT.CONECTANDO
+    val disponible = hardware.conexion in setOf(ConexionEstacionIoT.DESCONECTADO, ConexionEstacionIoT.ERROR)
+    val accionHabilitada = hardware.verificado && hardware.operacion == null &&
+        !sesion.escritura.estaPendiente && !sesion.envioComando.estaPendiente
+    WhiteCard(titulo = "Estación IoT", containerColor = Color.White) {
+        Text(when {
+            sincronizacion.errorLocal == ErrorColaHardware.SATURADA -> "El almacenamiento de historial está lleno. No se pudieron guardar nuevos eventos."
+            sincronizacion.errorLocal != null -> "Hay un problema con el historial local."
+            sincronizacion.noTransitorio -> "No fue posible sincronizar el historial"
+            sincronizacion.fase == FaseHistorialHardware.CARGANDO -> "Consultando historial pendiente…"
+            sincronizacion.fase == FaseHistorialHardware.SINCRONIZANDO -> "Sincronizando historial…"
+            sincronizacion.cantidadEventosPendientes > 0 -> "${sincronizacion.cantidadEventosPendientes} eventos pendientes de sincronizar"
+            else -> "Historial sincronizado"
+        }, style = MaterialTheme.typography.bodySmall, color = SafeHomeMuted)
+        if (sincronizacion.cantidadEventosPendientes > 0 && sincronizacion.fase != FaseHistorialHardware.SINCRONIZANDO) {
+            TextButton(onClick = { controlSesion.reintentarHistorialHardware(manual = true) }) { Text("Reintentar", color = SafeHomeViolet) }
+        }
+        Text(when (hardware.conexion) {
+            ConexionEstacionIoT.SIN_PERMISO -> "Permiso de dispositivos cercanos requerido"
+            ConexionEstacionIoT.BLUETOOTH_NO_DISPONIBLE -> "Bluetooth no disponible"
+            ConexionEstacionIoT.BLUETOOTH_APAGADO -> "Bluetooth desactivado"
+            ConexionEstacionIoT.DESCONECTADO, ConexionEstacionIoT.ERROR -> "Estación no conectada"
+            ConexionEstacionIoT.CONECTANDO -> "Conectando…"
+            ConexionEstacionIoT.CONECTADO_NO_VERIFICADO -> "Conectado · verificando dispositivo"
+            ConexionEstacionIoT.CONECTADO_VERIFICADO -> "Estación SafeHome conectada"
+        }, color = SafeHomeViolet, style = MaterialTheme.typography.titleMedium)
+        if (hardware.conexion == ConexionEstacionIoT.CONECTADO_VERIFICADO) Text("ID: ${hardware.idDispositivo}")
+        hardware.nombreBluetooth?.let { Text(it, color = SafeHomeMuted) }
+        hardware.error?.let { Text(it, color = SafeHomeCritical) }
+        hardware.errorOperacion?.let { Text(it, color = SafeHomeCritical) }
+        hardware.errorSincronizacion?.let { Text(it, color = SafeHomeMuted) }
+        if (hardware.verificado) {
+            FilaResumen("Sistema", when (hardware.sistema) {
+                SistemaHardware.ENCENDIDO -> "Activado"
+                SistemaHardware.APAGADO -> "Desactivado"
+                SistemaHardware.DESCONOCIDO -> "Estado desconocido"
+            })
+            FilaResumen("Puerta", when (hardware.puerta) {
+                PuertaHardware.ABIERTA -> "Abierta"
+                PuertaHardware.CERRADA -> "Cerrada"
+                PuertaHardware.DESCONOCIDA -> "Estado desconocido"
+            })
+            FilaResumen("Dispositivo portátil", when (hardware.portatil) {
+                PortatilHardware.PRESENTE -> "Dentro de rango"
+                PortatilHardware.FUERA_RANGO -> "Fuera de rango"
+                PortatilHardware.DESCONOCIDO -> "Estado desconocido"
+            })
+            Text(when (hardware.alarma) {
+                AlarmaHardware.NINGUNA -> "Alarma · Sin alertas"
+                AlarmaHardware.ADVERTENCIA -> "Alarma · Advertencia"
+                AlarmaHardware.CRITICA -> "Alarma · Alerta crítica"
+                AlarmaHardware.DESCONOCIDA -> "Alarma · Estado desconocido"
+            }, style = MaterialTheme.typography.titleMedium, color = when (hardware.alarma) {
+                AlarmaHardware.ADVERTENCIA -> SafeHomeWarning
+                AlarmaHardware.CRITICA -> SafeHomeCritical
+                AlarmaHardware.NINGUNA -> SafeHomeSuccess
+                AlarmaHardware.DESCONOCIDA -> SafeHomeMuted
+            })
+            hardware.operacion?.let { pendiente ->
+                Text(when (pendiente.accion) {
+                    AccionHardware.ENCENDER -> "Activando…"
+                    AccionHardware.APAGAR -> "Desactivando…"
+                    AccionHardware.RECONOCER_ALARMA -> "Reconociendo…"
+                }, color = SafeHomeViolet)
+                if (pendiente.ackRecibido) Text("Orden recibida. Esperando el estado de la Estación…", color = SafeHomeMuted)
+            }
+            when (hardware.sistema) {
+                SistemaHardware.ENCENDIDO -> BotonSecundario("Desactivar sistema", controlSesion::apagarSistemaIoT, enabled = accionHabilitada)
+                SistemaHardware.APAGADO -> BotonCoral("Activar sistema", controlSesion::encenderSistemaIoT, enabled = accionHabilitada)
+                SistemaHardware.DESCONOCIDO -> Unit
+            }
+            if (hardware.alarma in setOf(AlarmaHardware.ADVERTENCIA, AlarmaHardware.CRITICA)) {
+                BotonCoral("Reconocer alarma", controlSesion::reconocerAlarmaIoT, enabled = accionHabilitada)
+            }
+            TextButton(onClick = controlSesion::solicitarEstadoIoT, enabled = accionHabilitada) { Text("Actualizar estado", color = SafeHomeViolet) }
+        }
+        if (hardware.conexion == ConexionEstacionIoT.SIN_PERMISO) {
+            BotonCoral("Permitir Bluetooth", {
+                if (Build.VERSION.SDK_INT >= 31) permiso.launch(Manifest.permission.BLUETOOTH_CONNECT)
+            })
+        }
+        if (hardware.conexion == ConexionEstacionIoT.BLUETOOTH_APAGADO) {
+            Text("Activa Bluetooth desde Ajustes de Android.", color = SafeHomeMuted)
+        }
+        if (disponible) {
+            if (hardware.dispositivosConsultados && hardware.dispositivos.isEmpty()) {
+                Text("Empareja primero el ESP32 desde Ajustes de Android.", color = SafeHomeMuted)
+            }
+            BotonSecundario(hardware.dispositivos.find { it.direccion == direccion }?.nombre ?: "Seleccionar dispositivo emparejado",
+                { mostrarSelector = true }, enabled = hardware.dispositivos.isNotEmpty())
+            BotonCoral("Conectar", { direccion?.let(controlSesion::conectarEstacionIoT) },
+                enabled = hardware.dispositivos.any { it.direccion == direccion })
+        }
+        if (!ocupado) TextButton(onClick = controlSesion::obtenerDispositivosBluetoothVinculados) { Text("Actualizar Bluetooth", color = SafeHomeViolet) }
+        if (ocupado) BotonSecundario("Desconectar", controlSesion::desconectarEstacionIoT)
+        BotonSecundario("Probar comunicación", controlSesion::probarConexionEstacionIoT,
+            enabled = hardware.conectado && hardware.operacion == null && hardware.prueba != PruebaComunicacion.ESPERANDO)
+        when (hardware.prueba) {
+            PruebaComunicacion.ESPERANDO -> Text("Esperando respuesta al PING…", color = SafeHomeMuted)
+            PruebaComunicacion.RESPUESTA_VALIDA -> Text("Respuesta válida al PING recibida.", color = SafeHomeSuccess)
+            PruebaComunicacion.SIN_RESPUESTA -> Text("No se recibió confirmación del PING.", color = SafeHomeMuted)
+            PruebaComunicacion.SIN_PROBAR -> Unit
+        }
+    }
+    if (mostrarSelector) AlertDialog(
+        onDismissRequest = { mostrarSelector = false },
+        title = { Text("Dispositivos emparejados") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                hardware.dispositivos.forEachIndexed { indice, dispositivo ->
+                    TextButton(onClick = { seleccion = dispositivo.direccion; mostrarSelector = false }) {
+                        Text("${indice + 1}. ${dispositivo.nombre}")
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { mostrarSelector = false }) { Text("Cerrar") } }
+    )
 }
 
 @Composable
