@@ -1,5 +1,10 @@
 # USB Serial del portátil — diagnóstico local
 
+> **ARCHIVO HISTÓRICO — USB Android retirado.** La aplicación actual supervisa
+> Firestore con una cuenta Estación y no abre puertos USB ni usa la dependencia
+> JitPack descrita aquí. El Portátil es un ESP32, no una cuenta Android Móvil.
+> Véase [ContratoFirestoreSupervision.md](ContratoFirestoreSupervision.md).
+
 ## Implementación
 
 - Dependencia única: `com.github.mik3y:usb-serial-for-android:3.11.0`, declarada en el catálogo Gradle. JitPack está restringido al grupo `com.github.mik3y` en `dependencyResolutionManagement`.

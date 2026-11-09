@@ -1,5 +1,10 @@
 # Centro de mando de Estación — SH1
 
+> **ARCHIVO HISTÓRICO — Bluetooth retirado.** El firmware actual de Estación ya
+> no ofrece Bluetooth Classic y Android no mantiene este transporte ni comandos.
+> Este texto conserva el diseño anterior, no describe la aplicación vigente.
+> Véase [ContratoFirestoreSupervision.md](ContratoFirestoreSupervision.md).
+
 ## Flujo implementado
 
 - Bluetooth Classic cliente SPP, solo dispositivos emparejados. El ESP32 conserva el control autónomo de LED/buzzer.

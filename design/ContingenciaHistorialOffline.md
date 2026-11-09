@@ -1,5 +1,11 @@
 # Contingencia del historial físico
 
+> **ARCHIVO HISTÓRICO — implementación retirada.** La app de cuenta única Estación
+> no recibe SH1 ni escribe/reproduce esta cola. Sus preferencias existentes no se
+> borran ni migran automáticamente. La solución vigente está en
+> [ContratoFirestoreSupervision.md](ContratoFirestoreSupervision.md) y
+> [ArquitecturaSafeHomeFinal.md](ArquitecturaSafeHomeFinal.md).
+
 ## La alarma sigue siendo local
 
 El ESP32 Estación decide puerta/portátil/alarma y maneja LED y buzzer autónomamente. Esta cola solo protege HISTORIAL. No recibe comandos de actuadores ni condiciona alarmas a Internet, Android o Firebase. Los protocolos Bluetooth/USB, heartbeat Android y servicios de presencia no cambian.

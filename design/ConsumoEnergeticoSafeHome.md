@@ -1,5 +1,11 @@
 # Consumo energético SafeHome
 
+> **Actualización de arquitectura:** las secciones de USB OTG, Bluetooth, servicios
+> de presencia Android y cola corresponden al prototipo anterior y ya no aplican
+> a la APK actual. Los cálculos físicos siguientes siguen siendo estimaciones
+> históricas, no mediciones ni parámetros verificados del firmware vigente.
+> Android actual solo mantiene Auth y observadores Firestore mientras vive su sesión.
+
 ## Evidencia
 
 **MEDIDO:** nada todavía; no hay mediciones físicas de corriente, energía o autonomía aportadas por el proyecto.
