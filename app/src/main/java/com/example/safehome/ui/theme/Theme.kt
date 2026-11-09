@@ -13,10 +13,16 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = Color.White,
     secondary = SafeHomeCoral,
     onSecondary = SafeHomeInk,
+    primaryContainer = SafeHomeLilac,
+    onPrimaryContainer = SafeHomeViolet,
+    secondaryContainer = SafeHomeLilac,
+    onSecondaryContainer = SafeHomeViolet,
     background = SafeHomeCanvas,
     onBackground = SafeHomeInk,
     surface = SafeHomeSurface,
     onSurface = SafeHomeInk,
+    surfaceVariant = SafeHomeSoftSurface,
+    onSurfaceVariant = SafeHomeMuted,
     outline = SafeHomeOutline,
     error = SafeHomeCritical
 )

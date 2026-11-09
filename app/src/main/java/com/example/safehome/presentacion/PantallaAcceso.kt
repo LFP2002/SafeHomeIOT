@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -28,7 +29,8 @@ import com.example.safehome.ui.theme.*
     var errorLocal by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(estado.uid, modo) { clave = ""; confirmacion = ""; errorLocal = null }
     Surface(color = SafeHomeCanvas, modifier = Modifier.fillMaxSize()) {
-        Column(Modifier.safeDrawingPadding().imePadding().padding(22.dp).verticalScroll(rememberScrollState()),
+        Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = 480.dp).fillMaxWidth().padding(22.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(14.dp)) {
             CabeceraSafeHome("Supervisión IoT · Cuenta Estación")
             if (estado.uid != null) {
@@ -67,7 +69,7 @@ import com.example.safehome.ui.theme.*
                         else -> iniciar(correo, clave).let { it.correo ?: it.clave }
                     }
                 }, enabled = !estado.ocupado, modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = SafeHomeViolet)) {
+                    colors = ButtonDefaults.buttonColors(containerColor = SafeHomeCoral, contentColor = SafeHomeInk)) {
                     Text(when (modo) { "registro" -> "Registrar Estación"; "recuperar" -> "Enviar instrucciones"; else -> "Entrar" })
                 }
                 if (modo == "login") {
@@ -76,6 +78,7 @@ import com.example.safehome.ui.theme.*
                 } else TextButton(onClick = { modo = "login" }, enabled = !estado.ocupado) { Text("Volver a iniciar sesión") }
                 if (estado.ocupado) TextButton(onClick = cerrar) { Text("Cancelar acceso / cerrar sesión") }
             }
+        }
         }
     }
 }

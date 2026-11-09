@@ -14,6 +14,14 @@ private val NunitoConFallback = FontFamily(
 )
 
 val Typography = Typography(
+    displayLarge = Typography().displayLarge.copy(fontFamily = NunitoConFallback),
+    displayMedium = Typography().displayMedium.copy(fontFamily = NunitoConFallback),
+    headlineLarge = Typography().headlineLarge.copy(fontFamily = NunitoConFallback),
+    headlineMedium = Typography().headlineMedium.copy(fontFamily = NunitoConFallback),
+    titleSmall = Typography().titleSmall.copy(fontFamily = NunitoConFallback),
+    bodySmall = Typography().bodySmall.copy(fontFamily = NunitoConFallback),
+    labelMedium = Typography().labelMedium.copy(fontFamily = NunitoConFallback),
+    labelSmall = Typography().labelSmall.copy(fontFamily = NunitoConFallback),
     displaySmall = TextStyle(
         fontFamily = NunitoConFallback,
         fontWeight = FontWeight.Bold,
