@@ -1,12 +1,16 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "safehome-emqx",
+  "name": "safehome-emqx-staging",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "vars": {
+    "EMQX_BROKER_ID": "safehome_staging_1",
+    "GOOGLE_PROJECT_ID": "safehome-97695",
     "INGESTION_ENABLED": "false"
   },
-  "observability": { "enabled": false }
+  "observability": {
+    "enabled": false
+  }
 }
