@@ -1,6 +1,7 @@
 # Configuración y credenciales exclusivamente locales (cualquier nivel).
 google-services.json
 local.properties
+.mqtt.local.properties
 .env
 .env.*
 !.env.example

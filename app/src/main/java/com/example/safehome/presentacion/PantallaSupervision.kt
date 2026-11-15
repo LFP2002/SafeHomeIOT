@@ -11,7 +11,8 @@ import androidx.compose.ui.unit.dp
 import com.example.safehome.iot.*
 import com.example.safehome.ui.theme.*
 
-@Composable fun PantallaSupervision(panel: PanelSupervision, reintentar: () -> Unit) {
+@Composable fun PantallaSupervision(panel: PanelSupervision, reintentar: () -> Unit, enviar: (Boolean) -> Unit = {}) {
+    panel.mqtt?.let { PantallaMqtt(it, reintentar, enviar); return }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         EncabezadoSeccion("TU HOGAR", "Panel de supervisión", "Estado publicado de tus dispositivos y sensores.")
         AvisoSafeHome("Conexión MQTT no equivale a presencia física. Una desconexión no demuestra que alguien salió del hogar.")
@@ -25,6 +26,43 @@ import com.example.safehome.ui.theme.*
         )
         AvisoSafeHome("Lectura desde Firebase. La publicación física EMQX → Firebase está pendiente de integración.", TonoEstado.NEUTRO)
         BotonActualizar("Reintentar consultas", reintentar)
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@Composable private fun PantallaMqtt(panel: PanelMqtt, reintentar: () -> Unit, enviar: (Boolean) -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        EncabezadoSeccion("TU HOGAR", "Panel de supervisión", "MQTT directo · Hogar de demostración 9f21")
+        AvisoSafeHome("Conexión MQTT no equivale a presencia física. SIN DATOS no significa AUSENTE.")
+        TarjetaSafeHome("Conexión Android", icono = IconoSafeHome.DISPOSITIVO) {
+            Text(panel.conexion)
+            Text("Estación: ${if (panel.conectado) panel.estacion.name else "SIN DATOS (Android desconectado)"}")
+            Text("Portátil: ${if (panel.conectado) panel.portatil.name else "SIN DATOS (Android desconectado)"}")
+            Text("Disponibilidad del broker (LWT); no es un sensor de presencia.", color = SafeHomeMuted)
+        }
+        val estado = panel.estado
+        TarjetaSafeHome("Estado de Estación", icono = IconoSafeHome.PANEL) {
+            if (estado == null) Text("SIN DATOS · La Estación aún no ha publicado un estado válido.")
+            else {
+                val actual = panel.conectado && panel.estacion == Disponibilidad.ONLINE && !panel.retenido
+                AvisoSafeHome(if (actual) "Estado confirmado por una publicación en esta conexión; consulte su hora."
+                    else "Último estado conocido/retenido. No confirma el estado físico actual.", TonoEstado.NEUTRO)
+                Text("Vigilancia: ${if (estado.sistemaActivo) "ACTIVADA" else "DESACTIVADA"}")
+                EtiquetaEstado(visualPuerta(estado.puerta))
+                EtiquetaEstado(visualAlarma(estado.alarma))
+                Text("Portátil reportado por Estación: ${estado.portatil.name}")
+                DatoTemporal("Fecha publicada por Estación", Instante(estado.actualizadoEn))
+            }
+        }
+        TarjetaSafeHome("Control remoto", icono = IconoSafeHome.PANEL) {
+            Text("Activa o detiene vigilancia/alarma; no apaga ESP32, WiFi ni MQTT.")
+            Button(onClick = { enviar(true) }, enabled = panel.permiteControl, modifier = Modifier.fillMaxWidth()) { Text("ACTIVAR") }
+            OutlinedButton(onClick = { enviar(false) }, enabled = panel.permiteControl, modifier = Modifier.fillMaxWidth()) { Text("DESACTIVAR") }
+            panel.comando?.let { Text(it) }
+            Text("Se confirma solo con el eco de Estación. Active fecha y hora automáticas en el teléfono.", color = SafeHomeMuted)
+        }
+        panel.almacenamiento?.let { AvisoSafeHome(it, TonoEstado.AVISO) }
+        BotonActualizar("Reintentar conexión MQTT", reintentar)
         Spacer(Modifier.height(12.dp))
     }
 }

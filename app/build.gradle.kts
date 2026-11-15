@@ -1,9 +1,23 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.devtools.ksp") version "2.3.14"
 
     id("com.google.gms.google-services")
 }
+
+val mqttLocal = Properties().apply {
+    rootProject.file(".mqtt.local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+val mqttPassword = mqttLocal.getProperty("mqtt.password", "")
+val mqttPasswordLiteral = "\"" + mqttPassword.flatMap { c ->
+    when (c) {
+        '\\' -> "\\\\"; '"' -> "\\\""; '\n' -> "\\n"; '\r' -> "\\r"; '\t' -> "\\t"
+        else -> if (c.code in 32..126) c.toString() else "\\u%04x".format(c.code)
+    }.toList()
+}.joinToString("") + "\""
 
 android {
     namespace = "com.example.safehome"
@@ -17,6 +31,7 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("String", "MQTT_PASSWORD", mqttPasswordLiteral)
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -34,10 +49,23 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties"
+            )
+        }
     }
 }
 
 dependencies {
+    implementation("com.hivemq:hivemq-mqtt-client:1.4.2")
+    implementation("androidx.room:room-runtime:2.8.5")
+    ksp("androidx.room:room-compiler:2.8.5")
+    implementation("androidx.lifecycle:lifecycle-process:2.6.1")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

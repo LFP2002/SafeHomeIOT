@@ -14,7 +14,8 @@ data class PanelSupervision(
     val estacion: Lectura<EstadoDispositivo> = Lectura.Cargando,
     val portatil: Lectura<EstadoDispositivo> = Lectura.Cargando,
     val fisico: Lectura<EstadoFisico> = Lectura.Cargando,
-    val historial: Lectura<HistorialSupervision> = Lectura.Cargando)
+    val historial: Lectura<HistorialSupervision> = Lectura.Cargando,
+    val mqtt: PanelMqtt? = null)
 
 /** Serializa cambios de contexto y callbacks, incluso los ya encolados al cancelar. */
 class CoordinadorSupervision(private val repositorio: RepositorioSupervision,

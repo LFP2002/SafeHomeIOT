@@ -14,9 +14,9 @@ import com.example.safehome.ui.theme.SafeHomeMuted
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 20.dp)) {
         item {
-            EncabezadoSeccion("ACTIVIDAD DEL HOGAR", "Historial", "Hechos publicados; no se generan eventos desde Android.")
+            EncabezadoSeccion("ACTIVIDAD DEL HOGAR", "Historial", "Eventos MQTT recibidos y guardados en Room, solo de esta cuenta.")
         }
-        item { BotonActualizar("Actualizar consultas", reintentar) }
+        item { AvisoSafeHome("Historial local disponible offline. Puede estar incompleto si Android estuvo cerrado o desconectado. El estado retained no genera eventos.", TonoEstado.NEUTRO) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 ContenidoLectura(lectura) { historial ->

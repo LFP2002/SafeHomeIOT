@@ -127,8 +127,8 @@ fun fechaHora(instante: Instante?): String = instante?.let {
 
 @Composable fun <T> ContenidoLectura(lectura: Lectura<T>, contenido: @Composable (T) -> Unit) {
     when (lectura) {
-        Lectura.Cargando -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Consultando Firestore…", style = MaterialTheme.typography.bodyMedium) }
-        Lectura.SinDatos -> AvisoSafeHome("Sin datos publicados por el backend.", TonoEstado.NEUTRO, IconoSafeHome.DESCONOCIDO)
+        Lectura.Cargando -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Cargando datos…", style = MaterialTheme.typography.bodyMedium) }
+        Lectura.SinDatos -> AvisoSafeHome("Sin datos disponibles.", TonoEstado.NEUTRO, IconoSafeHome.DESCONOCIDO)
         Lectura.Invalida -> AvisoSafeHome("Datos incompatibles con el contrato de supervisión.", TonoEstado.CRITICO, IconoSafeHome.ERROR)
         is Lectura.Error -> AvisoSafeHome(lectura.mensaje, TonoEstado.CRITICO, IconoSafeHome.ERROR)
         is Lectura.Dato -> {
