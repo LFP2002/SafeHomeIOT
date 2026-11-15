@@ -1,0 +1,6 @@
+# Finales de línea estables sin depender de core.autocrlf de cada máquina.
+* text=auto eol=lf
+gradlew.bat text eol=crlf
+*.jar binary
+*.ttf binary
+*.webp binary

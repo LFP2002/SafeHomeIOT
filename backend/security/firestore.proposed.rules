@@ -1,0 +1,66 @@
+// PROPUESTA para emulador/revisión. No desplegar sin comparar las reglas remotas.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function ownProfile(uid) { return signedIn() && request.auth.uid == uid; }
+    function activeHome(hogarId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'estacion'
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.activo == true
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.hogarId == hogarId;
+    }
+    function validProfile(d, uid) {
+      return d.keys().hasAll(['rol', 'activo', 'hogarId', 'nombre'])
+        && d.keys().hasOnly(['rol', 'activo', 'hogarId', 'nombre'])
+        && d.rol == 'estacion' && d.activo == true && d.hogarId == uid
+        && uid.matches('^[A-Za-z0-9_-]{1,64}$')
+        && d.nombre is string && d.nombre.size() >= 2 && d.nombre.size() <= 40
+        && d.nombre.matches("^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' -]{2,40}$")
+        && !d.nombre.matches('^ .*|.* $|.*  .*');
+    }
+    function validHome(d, nombre) {
+      return d.keys().hasAll(['nombre', 'creadoEn'])
+        && d.keys().hasOnly(['nombre', 'creadoEn'])
+        && d.nombre == 'Hogar de ' + nombre && d.creadoEn == request.time;
+    }
+
+    match /usuarios/{uid} {
+      // Permite leer perfil propio incluso ausente/inactivo: registro y guardia de sesión.
+      allow get: if ownProfile(uid);
+      allow list: if false;
+      allow create: if ownProfile(uid) && validProfile(request.resource.data, uid)
+        && !exists(/databases/$(database)/documents/hogares/$(uid))
+        && validHome(getAfter(/databases/$(database)/documents/hogares/$(uid)).data,
+          request.resource.data.nombre);
+      allow update, delete: if false;
+    }
+    match /hogares/{hogarId} {
+      // El get propio posibilita comprobar inexistencia/reintento de registro atómico.
+      allow get: if activeHome(hogarId) || (signedIn() && request.auth.uid == hogarId);
+      allow list: if false;
+      allow create: if signedIn() && request.auth.uid == hogarId
+        && !exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && validProfile(getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data, hogarId)
+        && validHome(request.resource.data,
+          getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.nombre);
+      allow update, delete: if false;
+
+      match /dispositivos/{dispositivo} {
+        allow get, list: if activeHome(hogarId) && dispositivo in ['estacion', 'portatil'];
+        allow write: if false;
+      }
+      match /estadoFisico/{documento} {
+        allow get, list: if activeHome(hogarId) && documento == 'actual';
+        allow write: if false;
+      }
+      match /historial/{eventoId} {
+        allow get, list: if activeHome(hogarId);
+        allow write: if false;
+      }
+    }
+    // Registro administrativo, recibos, cursores y rutas antiguas nunca son cliente.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

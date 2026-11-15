@@ -1,0 +1,15 @@
+node_modules/
+lib/
+coverage/
+.firebase/
+*-debug.log
+*.log
+.secret.local
+.runtimeconfig.json
+dist/
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+/reference/*.zip
