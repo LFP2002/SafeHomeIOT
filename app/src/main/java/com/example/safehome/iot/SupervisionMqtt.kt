@@ -20,7 +20,8 @@ class SupervisionMqtt(context: Context, private val scope: CoroutineScope,
     private var reintento: Job? = null
     private var historial: Job? = null
     private var timeout: Job? = null
-    private var pendiente: Pair<String, Boolean>? = null
+    private enum class Comando { ACTIVAR, DESACTIVAR, RECONOCER }
+    private var pendiente: Pair<String, Comando>? = null
     private var panel = PanelSupervision(mqtt = PanelMqtt())
     private val preferencias = context.getSharedPreferences("mqtt-identidad", Context.MODE_PRIVATE)
     private val clientId = preferencias.getString("clientId", null) ?: ("SafeHome-Android-" + UUID.randomUUID())
@@ -156,9 +157,20 @@ class SupervisionMqtt(context: Context, private val scope: CoroutineScope,
                 val estado = MensajesMqtt.estado(texto) ?: return
                 emitir { it.copy(estado = estado, retenido = retained) }
                 val orden = pendiente
-                if (orden != null && estado.ultimoComandoId == orden.first && estado.sistemaActivo == orden.second) {
+                val confirmado = when (orden?.second) {
+                    Comando.ACTIVAR -> estado.sistemaActivo
+                    Comando.DESACTIVAR -> !estado.sistemaActivo
+                    Comando.RECONOCER -> estado.alarma == Alarma.NORMAL
+                    null -> false
+                }
+                if (orden != null && estado.ultimoComandoId == orden.first && confirmado) {
                     pendiente = null; timeout?.cancel()
-                    emitir { it.copy(esperando = false, comando = "Confirmado por Estación: ${if (orden.second) "ACTIVADO" else "DESACTIVADO"}") }
+                    val resultado = when (orden.second) {
+                        Comando.ACTIVAR -> "ACTIVADO"
+                        Comando.DESACTIVAR -> "DESACTIVADO"
+                        Comando.RECONOCER -> "ALARMA SILENCIADA"
+                    }
+                    emitir { it.copy(esperando = false, comando = "Confirmado por Estación: $resultado") }
                 }
             }
             TopicsMqtt.EVENTO -> {
@@ -173,11 +185,17 @@ class SupervisionMqtt(context: Context, private val scope: CoroutineScope,
         }
     }
     fun enviar(activar: Boolean) {
-        if (!autorizada() || panel.mqtt?.permiteControl != true) return
+        enviar(if (activar) Comando.ACTIVAR else Comando.DESACTIVAR)
+    }
+    fun reconocer() = enviar(Comando.RECONOCER)
+    private fun enviar(comando: Comando) {
+        val mqtt = panel.mqtt ?: return
+        if (!autorizada() || pendiente != null || !mqtt.permiteControl) return
+        if (comando == Comando.RECONOCER && !mqtt.permiteReconocer) return
         val ahora = System.currentTimeMillis()
         if (ahora.toString().length != 13) { emitir { it.copy(comando = "Corrija la fecha y hora del teléfono.") }; return }
         val id = UUID.randomUUID().toString()
-        pendiente = id to activar
+        pendiente = id to comando
         emitir { it.copy(esperando = true, comando = "Esperando confirmación de Estación…") }
         timeout = scope.launch {
             delay(10_000)
@@ -186,7 +204,7 @@ class SupervisionMqtt(context: Context, private val scope: CoroutineScope,
                 emitir { it.copy(esperando = false, comando = "Sin confirmación tras 10 s. Resultado desconocido; compruebe la hora y reintente manualmente.") }
             }
         }
-        val texto = "${if (activar) "ACTIVAR" else "DESACTIVAR"}|$ahora|$id"
+        val texto = "${comando.name}|$ahora|$id"
         try {
             cliente.publishWith().topic(TopicsMqtt.COMANDO).qos(MqttQos.AT_LEAST_ONCE).retain(false)
                 .payload(texto.toByteArray(Charsets.UTF_8)).send().whenComplete { _, error -> scope.launch {

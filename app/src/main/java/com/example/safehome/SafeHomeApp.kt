@@ -48,7 +48,8 @@ fun SafeHomeApp(controlSesion: ControlSesion) {
                 CabeceraSafeHome("Estación · ${perfil.nombreVisible}")
                 Box(Modifier.weight(1f)) {
                     when (seleccion) {
-                        0 -> PantallaSupervision(panel, controlSesion::reintentarSupervision, controlSesion::enviarComando)
+                        0 -> PantallaSupervision(panel, controlSesion::reintentarSupervision,
+                            controlSesion::enviarComando, controlSesion::reconocerAlarma)
                         1 -> PantallaHistorial(panel.historial, controlSesion::reintentarSupervision)
                         else -> PantallaCuenta(perfil, controlSesion::cerrarSesion)
                     }
