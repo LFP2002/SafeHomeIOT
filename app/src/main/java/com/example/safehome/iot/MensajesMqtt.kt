@@ -16,6 +16,8 @@ data class PanelMqtt(val conexion: String = "Desconectado", val conectado: Boole
     val esperando: Boolean = false, val comando: String? = null,
     val almacenamiento: String? = null) {
     val permiteControl get() = conectado && estacion == Disponibilidad.ONLINE && !esperando
+    val permiteReconocer get() = permiteControl && estado?.sistemaActivo == true &&
+        (estado.alarma == Alarma.ADVERTENCIA || estado.alarma == Alarma.CRITICA)
 }
 
 /** Solo estos topics pueden suscribirse/publicarse. Hogar MQTT fijo del prototipo. */

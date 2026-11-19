@@ -35,6 +35,7 @@ class ControlSesion(application: Application) : AndroidViewModel(application), D
     override fun onStart(owner: LifecycleOwner) { supervisor.primerPlano(true) }
     override fun onStop(owner: LifecycleOwner) { supervisor.primerPlano(false) }
     fun enviarComando(activar: Boolean) = supervisor.enviar(activar)
+    fun reconocerAlarma() = supervisor.reconocer()
     /** Solo historial propio: no autoriza MQTT ni usa un perfil de caché para conectarse. */
     fun historialOffline(uid: String): Flow<Lectura<HistorialSupervision>> {
         if (FirebaseAuth.getInstance().currentUser?.uid != uid) return flowOf(Lectura.SinDatos)

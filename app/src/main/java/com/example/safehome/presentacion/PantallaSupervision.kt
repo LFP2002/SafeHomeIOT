@@ -11,8 +11,8 @@ import androidx.compose.ui.unit.dp
 import com.example.safehome.iot.*
 import com.example.safehome.ui.theme.*
 
-@Composable fun PantallaSupervision(panel: PanelSupervision, reintentar: () -> Unit, enviar: (Boolean) -> Unit = {}) {
-    panel.mqtt?.let { PantallaMqtt(it, reintentar, enviar); return }
+@Composable fun PantallaSupervision(panel: PanelSupervision, reintentar: () -> Unit, enviar: (Boolean) -> Unit = {}, reconocer: () -> Unit = {}) {
+    panel.mqtt?.let { PantallaMqtt(it, reintentar, enviar, reconocer); return }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         EncabezadoSeccion("TU HOGAR", "Panel de supervisión", "Estado publicado de tus dispositivos y sensores.")
         AvisoSafeHome("Conexión MQTT no equivale a presencia física. Una desconexión no demuestra que alguien salió del hogar.")
@@ -30,7 +30,7 @@ import com.example.safehome.ui.theme.*
     }
 }
 
-@Composable private fun PantallaMqtt(panel: PanelMqtt, reintentar: () -> Unit, enviar: (Boolean) -> Unit) {
+@Composable private fun PantallaMqtt(panel: PanelMqtt, reintentar: () -> Unit, enviar: (Boolean) -> Unit, reconocer: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         EncabezadoSeccion("TU HOGAR", "Panel de supervisión", "MQTT directo · Hogar de demostración 9f21")
         AvisoSafeHome("Conexión MQTT no equivale a presencia física. SIN DATOS no significa AUSENTE.")
@@ -58,6 +58,8 @@ import com.example.safehome.ui.theme.*
             Text("Activa o detiene vigilancia/alarma; no apaga ESP32, WiFi ni MQTT.")
             Button(onClick = { enviar(true) }, enabled = panel.permiteControl, modifier = Modifier.fillMaxWidth()) { Text("ACTIVAR") }
             OutlinedButton(onClick = { enviar(false) }, enabled = panel.permiteControl, modifier = Modifier.fillMaxWidth()) { Text("DESACTIVAR") }
+            OutlinedButton(onClick = reconocer, enabled = panel.permiteReconocer, modifier = Modifier.fillMaxWidth()) { Text("SILENCIAR ALARMA") }
+            Text("Silenciar reconoce la alarma sin desactivar la vigilancia.", color = SafeHomeMuted)
             panel.comando?.let { Text(it) }
             Text("Se confirma solo con el eco de Estación. Active fecha y hora automáticas en el teléfono.", color = SafeHomeMuted)
         }
