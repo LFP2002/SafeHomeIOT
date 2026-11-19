@@ -22,7 +22,7 @@ enum class IconoSafeHome(@param:DrawableRes val recurso: Int) {
     NORMAL(R.drawable.bi_shield_check), ADVERTENCIA(R.drawable.bi_exclamation_triangle),
     ERROR(R.drawable.bi_x_circle), DESCONOCIDO(R.drawable.bi_question_circle),
     CONECTADO(R.drawable.bi_wifi), DESCONECTADO(R.drawable.bi_wifi_off),
-    ACTUALIZAR(R.drawable.bi_arrow_clockwise), ALARMA(R.drawable.bi_bell),
+    ACTUALIZAR(R.drawable.bi_arrow_clockwise), ALARMA(R.drawable.bi_bell), SILENCIAR(R.drawable.bi_bell_slash),
     SISTEMA(R.drawable.bi_power), SALIR(R.drawable.bi_box_arrow_right), INFO(R.drawable.bi_info_circle)
 }
 
@@ -52,22 +52,22 @@ data class EstadoVisual(val texto: String, val icono: IconoSafeHome, val tono: T
 
 /** Solo presentación: no infiere presencia física ni modifica estados del dominio. */
 fun visualConexion(conexion: ConexionMqtt): EstadoVisual = when (conexion) {
-    ConexionMqtt.CONECTADO -> EstadoVisual("Conectado a MQTT", IconoSafeHome.CONECTADO, TonoEstado.POSITIVO)
-    ConexionMqtt.DESCONECTADO -> EstadoVisual("Desconectado de MQTT", IconoSafeHome.DESCONECTADO, TonoEstado.AVISO)
-    ConexionMqtt.DESCONOCIDO -> EstadoVisual("Estado MQTT desconocido", IconoSafeHome.DESCONOCIDO, TonoEstado.NEUTRO)
+    ConexionMqtt.CONECTADO -> EstadoVisual("Conectado", IconoSafeHome.CONECTADO, TonoEstado.POSITIVO)
+    ConexionMqtt.DESCONECTADO -> EstadoVisual("Desconectado", IconoSafeHome.DESCONECTADO, TonoEstado.CRITICO)
+    ConexionMqtt.DESCONOCIDO -> EstadoVisual("Sin datos", IconoSafeHome.DESCONOCIDO, TonoEstado.NEUTRO)
 }
 
 fun visualPuerta(puerta: Puerta): EstadoVisual = when (puerta) {
-    Puerta.ABIERTA -> EstadoVisual("Abierta", IconoSafeHome.PUERTA_ABIERTA, TonoEstado.INFORMATIVO)
+    Puerta.ABIERTA -> EstadoVisual("Abierta", IconoSafeHome.PUERTA_ABIERTA, TonoEstado.AVISO)
     Puerta.CERRADA -> EstadoVisual("Cerrada", IconoSafeHome.PUERTA_CERRADA, TonoEstado.INFORMATIVO)
-    Puerta.SIN_DATOS -> EstadoVisual("Estado desconocido", IconoSafeHome.DESCONOCIDO, TonoEstado.NEUTRO)
+    Puerta.SIN_DATOS -> EstadoVisual("Sin datos", IconoSafeHome.DESCONOCIDO, TonoEstado.NEUTRO)
 }
 
 fun visualAlarma(alarma: Alarma): EstadoVisual = when (alarma) {
     Alarma.NORMAL -> EstadoVisual("Normal", IconoSafeHome.NORMAL, TonoEstado.POSITIVO)
     Alarma.ADVERTENCIA -> EstadoVisual("Advertencia", IconoSafeHome.ADVERTENCIA, TonoEstado.AVISO)
     Alarma.CRITICA -> EstadoVisual("Crítica", IconoSafeHome.ALARMA, TonoEstado.CRITICO)
-    Alarma.SIN_DATOS -> EstadoVisual("Estado desconocido", IconoSafeHome.DESCONOCIDO, TonoEstado.NEUTRO)
+    Alarma.SIN_DATOS -> EstadoVisual("Sin datos", IconoSafeHome.DESCONOCIDO, TonoEstado.NEUTRO)
 }
 
 fun visualEvento(tipo: String): Pair<IconoSafeHome, TonoEstado> = when (tipo) {
@@ -77,11 +77,13 @@ fun visualEvento(tipo: String): Pair<IconoSafeHome, TonoEstado> = when (tipo) {
     "PUERTA_CERRADA" -> IconoSafeHome.PUERTA_CERRADA to TonoEstado.INFORMATIVO
     "ALARMA_ADVERTENCIA", "PORTATIL_FUERA_RANGO", "PORTATIL_AUSENTE" -> IconoSafeHome.ADVERTENCIA to TonoEstado.AVISO
     "ALARMA_CRITICA" -> IconoSafeHome.ALARMA to TonoEstado.CRITICO
-    "ALARMA_RECONOCIDA", "ALARMA_NORMAL" -> IconoSafeHome.NORMAL to TonoEstado.INFORMATIVO
+    "ALARMA_RECONOCIDA" -> IconoSafeHome.SILENCIAR to TonoEstado.INFORMATIVO
+    "ALARMA_NORMAL" -> IconoSafeHome.NORMAL to TonoEstado.POSITIVO
     "RECONOCIMIENTO_SOLICITADO" -> IconoSafeHome.ALARMA to TonoEstado.INFORMATIVO
     "SISTEMA_ACTIVADO", "SISTEMA_DESACTIVADO" -> IconoSafeHome.SISTEMA to TonoEstado.INFORMATIVO
     "MOVIL_CONECTADO", "MOVIL_DESCONECTADO" -> IconoSafeHome.CUENTA to TonoEstado.NEUTRO
-    "PORTATIL_RECONECTADO", "PORTATIL_RECUPERADO" -> IconoSafeHome.DISPOSITIVO to TonoEstado.NEUTRO
+    "PORTATIL_RECONECTADO" -> IconoSafeHome.DISPOSITIVO to TonoEstado.NEUTRO
+    "PORTATIL_RECUPERADO" -> IconoSafeHome.CONECTADO to TonoEstado.POSITIVO
     "ESTADO_ACTUALIZADO" -> IconoSafeHome.HISTORIAL to TonoEstado.NEUTRO
     else -> IconoSafeHome.INFO to TonoEstado.NEUTRO
 }

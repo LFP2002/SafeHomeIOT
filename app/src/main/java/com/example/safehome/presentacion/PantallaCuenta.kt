@@ -8,23 +8,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.safehome.PerfilUsuario
-import com.example.safehome.ui.theme.*
+import com.example.safehome.ui.theme.SafeHomeMuted
 
 @Composable fun PantallaCuenta(perfil: PerfilUsuario, cerrar: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        EncabezadoSeccion("TU CUENTA", "Cuenta", "Información de acceso y supervisión.")
-        TarjetaSafeHome("Cuenta Estación", icono = IconoSafeHome.CUENTA) {
-            Text(perfil.nombreVisible, style = MaterialTheme.typography.titleLarge)
-            EtiquetaEstado(EstadoVisual("Rol: Estación", IconoSafeHome.DISPOSITIVO, TonoEstado.INFORMATIVO))
-            Text("Panel de lectura de los ESP32 del hogar asignado.")
-            Text("No hay cuentas Móvil, vinculación de teléfonos ni comandos físicos en esta versión.")
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(EspacioSafeHome.seccion)) {
+        EncabezadoSeccion("", "Cuenta", "Tu perfil en SafeHome")
+        TarjetaSafeHome(perfil.nombreVisible, icono = IconoSafeHome.CUENTA) {
+            EtiquetaEstado(EstadoVisual("Estación", IconoSafeHome.PANEL, TonoEstado.INFORMATIVO))
+            if (perfil.hogarId.isNotBlank()) {
+                Text("Hogar asignado", color = SafeHomeMuted, style = MaterialTheme.typography.bodyMedium)
+                Text(perfil.hogarId, style = MaterialTheme.typography.bodyLarge)
+            }
         }
-        Button(onClick = cerrar, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(
-            containerColor = SafeHomeLilac, contentColor = SafeHomeViolet)) {
-            IconoSafeHome(IconoSafeHome.SALIR)
-            Spacer(Modifier.width(8.dp))
-            Text("Cerrar sesión")
-        }
-        Spacer(Modifier.height(12.dp))
+        AccionSecundaria("Cerrar sesión", IconoSafeHome.SALIR, accion = cerrar)
     }
 }

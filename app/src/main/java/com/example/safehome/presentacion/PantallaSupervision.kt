@@ -4,120 +4,128 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.safehome.iot.*
 import com.example.safehome.ui.theme.*
+import kotlinx.coroutines.delay
 
-@Composable fun PantallaSupervision(panel: PanelSupervision, reintentar: () -> Unit, enviar: (Boolean) -> Unit = {}, reconocer: () -> Unit = {}) {
-    panel.mqtt?.let { PantallaMqtt(it, reintentar, enviar, reconocer); return }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        EncabezadoSeccion("TU HOGAR", "Panel de supervisión", "Estado publicado de tus dispositivos y sensores.")
-        AvisoSafeHome("Conexión MQTT no equivale a presencia física. Una desconexión no demuestra que alguien salió del hogar.")
-        ParejaAdaptable(
-            primero = { TarjetaDispositivo("ESP32 Estación", "Nodo fijo del hogar", panel.estacion) },
-            segundo = { TarjetaDispositivo("ESP32 Portátil", "Dispositivo físico portátil", panel.portatil) }
-        )
-        ParejaAdaptable(
-            primero = { TarjetaPuerta(panel) },
-            segundo = { TarjetaAlarma(panel.fisico) }
-        )
-        AvisoSafeHome("Lectura desde Firebase. La publicación física EMQX → Firebase está pendiente de integración.", TonoEstado.NEUTRO)
-        BotonActualizar("Reintentar consultas", reintentar)
-        Spacer(Modifier.height(12.dp))
+@Composable fun PantallaSupervision(panel: PanelSupervision, reintentar: () -> Unit,
+    enviar: (Boolean) -> Unit = {}, reconocer: () -> Unit = {}) {
+    // Reloj solo visual: no persiste estado ni altera disponibilidad o permisos.
+    val ahora by produceState(System.currentTimeMillis()) {
+        while (true) { value = System.currentTimeMillis(); delay(5_000) }
     }
-}
-
-@Composable private fun PantallaMqtt(panel: PanelMqtt, reintentar: () -> Unit, enviar: (Boolean) -> Unit, reconocer: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        EncabezadoSeccion("TU HOGAR", "Panel de supervisión", "MQTT directo · Hogar de demostración 9f21")
-        AvisoSafeHome("Conexión MQTT no equivale a presencia física. SIN DATOS no significa AUSENTE.")
-        TarjetaSafeHome("Conexión Android", icono = IconoSafeHome.DISPOSITIVO) {
-            Text(panel.conexion)
-            Text("Estación: ${if (panel.conectado) panel.estacion.name else "SIN DATOS (Android desconectado)"}")
-            Text("Portátil: ${if (panel.conectado) panel.portatil.name else "SIN DATOS (Android desconectado)"}")
-            Text("Disponibilidad del broker (LWT); no es un sensor de presencia.", color = SafeHomeMuted)
-        }
-        val estado = panel.estado
-        TarjetaSafeHome("Estado de Estación", icono = IconoSafeHome.PANEL) {
-            if (estado == null) Text("SIN DATOS · La Estación aún no ha publicado un estado válido.")
-            else {
-                val actual = panel.conectado && panel.estacion == Disponibilidad.ONLINE && !panel.retenido
-                AvisoSafeHome(if (actual) "Estado confirmado por una publicación en esta conexión; consulte su hora."
-                    else "Último estado conocido/retenido. No confirma el estado físico actual.", TonoEstado.NEUTRO)
-                Text("Vigilancia: ${if (estado.sistemaActivo) "ACTIVADA" else "DESACTIVADA"}")
-                EtiquetaEstado(visualPuerta(estado.puerta))
-                EtiquetaEstado(visualAlarma(estado.alarma))
-                Text("Portátil reportado por Estación: ${estado.portatil.name}")
-                DatoTemporal("Fecha publicada por Estación", Instante(estado.actualizadoEn))
-            }
-        }
-        TarjetaSafeHome("Control remoto", icono = IconoSafeHome.PANEL) {
-            Text("Activa o detiene vigilancia/alarma; no apaga ESP32, WiFi ni MQTT.")
-            Button(onClick = { enviar(true) }, enabled = panel.permiteControl, modifier = Modifier.fillMaxWidth()) { Text("ACTIVAR") }
-            OutlinedButton(onClick = { enviar(false) }, enabled = panel.permiteControl, modifier = Modifier.fillMaxWidth()) { Text("DESACTIVAR") }
-            OutlinedButton(onClick = reconocer, enabled = panel.permiteReconocer, modifier = Modifier.fillMaxWidth()) { Text("SILENCIAR ALARMA") }
-            Text("Silenciar reconoce la alarma sin desactivar la vigilancia.", color = SafeHomeMuted)
-            panel.comando?.let { Text(it) }
-            Text("Se confirma solo con el eco de Estación. Active fecha y hora automáticas en el teléfono.", color = SafeHomeMuted)
-        }
-        panel.almacenamiento?.let { AvisoSafeHome(it, TonoEstado.AVISO) }
-        BotonActualizar("Reintentar conexión MQTT", reintentar)
-        Spacer(Modifier.height(12.dp))
-    }
-}
-
-/** Una columna en móviles y con texto ampliado; dos columnas cuando hay espacio real. */
-@Composable private fun ParejaAdaptable(primero: @Composable () -> Unit, segundo: @Composable () -> Unit) {
-    val escalaFuente = LocalDensity.current.fontScale
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        if (maxWidth >= 640.dp && escalaFuente <= 1.3f) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(Modifier.weight(1f)) { primero() }
-                Box(Modifier.weight(1f)) { segundo() }
-            }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(EspacioSafeHome.seccion)) {
+        EncabezadoSeccion("", "Panel de control", "Supervisa y controla tu hogar")
+        val mqtt = panel.mqtt
+        if (mqtt == null) {
+            PanelSinConexion(panel, reintentar)
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { primero(); segundo() }
-        }
-    }
-}
-
-@Composable private fun TarjetaDispositivo(titulo: String, detalle: String, lectura: Lectura<EstadoDispositivo>) {
-    TarjetaSafeHome(titulo, icono = IconoSafeHome.DISPOSITIVO) {
-        Text(detalle, color = SafeHomeMuted, style = MaterialTheme.typography.bodyMedium)
-        ContenidoLectura(lectura) { dispositivo ->
-            EtiquetaEstado(visualConexion(dispositivo.mqtt), (lectura as? Lectura.Dato)?.desdeCache == true)
-            DatoTemporal("Última actualización", dispositivo.actualizadoEn)
-            DatoTemporal("Último heartbeat conocido", dispositivo.ultimoHeartbeatEn)
-        }
-        if (lectura !is Lectura.Dato) Text("Estado MQTT desconocido", color = SafeHomeMuted, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable private fun TarjetaPuerta(panel: PanelSupervision) {
-    val fisico = (panel.fisico as? Lectura.Dato)?.valor
-    TarjetaSafeHome("Puerta", icono = fisico?.let { visualPuerta(it.puerta).icono } ?: IconoSafeHome.DESCONOCIDO) {
-        ContenidoLectura(panel.fisico) {
-            EtiquetaEstado(visualPuerta(it.puerta), (panel.fisico as? Lectura.Dato)?.desdeCache == true)
-            DatoTemporal("Último cambio confirmado", it.puertaCambiadaEn)
-            DatoTemporal("Última actualización", it.actualizadoEn)
-            if (puertaPuedeEstarDesactualizada(panel.estacion, panel.fisico)) {
-                AvisoSafeHome("La Estación no tiene conexión MQTT confirmada o los datos son de caché. El estado conocido de la puerta puede estar desactualizado.",
+            ResumenSistema(mqtt, ahora)
+            Column(verticalArrangement = Arrangement.spacedBy(EspacioSafeHome.tarjetas)) {
+                ParejaEstados(
+                    { TarjetaEstado("Conexión", conexionVisual(mqtt)) },
+                    { TarjetaEstado("Estación", disponibilidadVisual(mqtt.estacion, mqtt.conectado)) })
+                ParejaEstados(
+                    { TarjetaEstado("Portátil", disponibilidadVisual(mqtt.portatil, mqtt.conectado)) },
+                    { TarjetaEstado("Vigilancia", vigilanciaVisual(mqtt, ahora)) })
+            }
+            SensoresSistema(mqtt, ahora)
+            ControlesVigilancia(mqtt, enviar, reconocer)
+            mqtt.almacenamiento?.let {
+                AvisoSafeHome("No se pudo guardar parte de la actividad. El historial puede estar incompleto.",
                     TonoEstado.AVISO, IconoSafeHome.ADVERTENCIA)
             }
+            if (!mqtt.conectado) {
+                when {
+                    conexionVisual(mqtt).tono == TonoEstado.AVISO -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                    mqtt.conexion.contains("configurar") -> AvisoSafeHome("La conexión necesita configuración. Contacta con la persona que administra el sistema.", TonoEstado.AVISO)
+                    else -> {
+                        if (mqtt.conexion.startsWith("No conectado")) AvisoSafeHome("No se pudo conectar. Revisa tu conexión o contacta con quien administra el sistema.", TonoEstado.AVISO)
+                        BotonActualizar("Reintentar conexión", reintentar)
+                    }
+                }
+            }
         }
     }
 }
 
-@Composable private fun TarjetaAlarma(lectura: Lectura<EstadoFisico>) {
-    TarjetaSafeHome("Alarma", icono = IconoSafeHome.ALARMA) {
-        ContenidoLectura(lectura) {
-            EtiquetaEstado(visualAlarma(it.alarma), (lectura as? Lectura.Dato)?.desdeCache == true)
-            DatoTemporal("Última actualización", it.actualizadoEn)
-            Text("Nivel publicado por el backend. No se envían comandos desde este panel.",
-                style = MaterialTheme.typography.bodyMedium, color = SafeHomeMuted)
+@Composable private fun ResumenSistema(panel: PanelMqtt, ahora: Long) {
+    val resumen = resumenVisual(panel, ahora)
+    val color = resumen.tono.color()
+    Surface(color = color.copy(alpha = 0.08f), shape = MaterialTheme.shapes.small) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            MedallonIcono(resumen.icono, resumen.tono)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(resumen.texto, color = color, style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() })
+                Text(when {
+                    !panel.conectado -> if (conexionVisual(panel).tono == TonoEstado.AVISO) "Estableciendo conexión con tu hogar" else "Los controles no están disponibles"
+                    panel.estacion == Disponibilidad.OFFLINE -> "No se puede confirmar el estado de tu hogar"
+                    panel.estado == null || panel.estacion != Disponibilidad.ONLINE -> "Esperando información de la Estación"
+                    !estadoVigente(panel, ahora) -> "La información disponible no confirma la situación actual"
+                    else -> "Actualizado ${fechaHora(Instante(panel.estado.actualizadoEn))}"
+                }, style = MaterialTheme.typography.bodyMedium, color = SafeHomeMuted)
+            }
         }
     }
+}
+
+@Composable private fun SensoresSistema(panel: PanelMqtt, ahora: Long) {
+    val estado = panel.estado
+    val anterior = estado != null && !estadoVigente(panel, ahora)
+    Column(verticalArrangement = Arrangement.spacedBy(EspacioSafeHome.tarjetas)) {
+        Text("En tu hogar", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+        if (anterior) AvisoSafeHome("Último estado conocido · ${fechaHora(estado?.let { Instante(it.actualizadoEn) })}",
+            TonoEstado.NEUTRO, IconoSafeHome.HISTORIAL)
+        ParejaEstados(
+            { TarjetaEstado("Puerta", visualPuerta(estado?.puerta ?: Puerta.SIN_DATOS), anterior) },
+            { TarjetaEstado("Alarma", visualAlarma(estado?.alarma ?: Alarma.SIN_DATOS), anterior) })
+        // Esta señal procede de Estación: no se confunde con la conexión del Portátil.
+        val presencia = estado?.portatil ?: PresenciaPortatil.SIN_DATOS
+        val senal = when (presencia) {
+            PresenciaPortatil.PRESENTE -> EstadoVisual("Señal recibida", IconoSafeHome.CONECTADO, TonoEstado.POSITIVO)
+            PresenciaPortatil.AUSENTE -> EstadoVisual("Sin señal", IconoSafeHome.ADVERTENCIA, TonoEstado.AVISO)
+            PresenciaPortatil.SIN_DATOS -> EstadoVisual("Sin datos", IconoSafeHome.DESCONOCIDO, TonoEstado.NEUTRO)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            IconoSafeHome(senal.icono, tint = (if (anterior) TonoEstado.NEUTRO else senal.tono).color())
+            Column(Modifier.weight(1f)) {
+                Text("Señal del Portátil: ${senal.texto.lowercase()}", style = MaterialTheme.typography.bodyMedium)
+                Text(if (anterior) "Último reporte de la Estación" else "Reportada por la Estación",
+                    style = MaterialTheme.typography.bodySmall, color = SafeHomeMuted)
+            }
+        }
+    }
+}
+
+@Composable private fun ControlesVigilancia(panel: PanelMqtt, enviar: (Boolean) -> Unit, reconocer: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Control de vigilancia", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+        AccionPrincipal("Activar vigilancia", IconoSafeHome.NORMAL, panel.permiteControl) { enviar(true) }
+        AccionSecundaria("Desactivar vigilancia", IconoSafeHome.SISTEMA, panel.permiteControl) { enviar(false) }
+        AccionSecundaria("Silenciar alarma", IconoSafeHome.SILENCIAR, panel.permiteReconocer, reconocer)
+        resultadoVisual(panel)?.let {
+            AvisoSafeHome(it.texto, it.tono, it.icono)
+        }
+    }
+}
+
+/** Compatibilidad de lectura: no construye una conexión ni controles desde datos anteriores. */
+@Composable private fun PanelSinConexion(panel: PanelSupervision, reintentar: () -> Unit) {
+    AvisoSafeHome("Supervisión sin conexión", TonoEstado.NEUTRO, IconoSafeHome.DESCONECTADO)
+    ParejaEstados(
+        { TarjetaSafeHome("Estación", icono = IconoSafeHome.PANEL) { ContenidoLectura(panel.estacion) { EtiquetaEstado(visualConexion(it.mqtt), true) } } },
+        { TarjetaSafeHome("Portátil", icono = IconoSafeHome.DISPOSITIVO) { ContenidoLectura(panel.portatil) { EtiquetaEstado(visualConexion(it.mqtt), true) } } })
+    ContenidoLectura(panel.fisico) {
+        ParejaEstados({ TarjetaEstado("Puerta", visualPuerta(it.puerta), true) },
+            { TarjetaEstado("Alarma", visualAlarma(it.alarma), true) })
+    }
+    ControlesVigilancia(PanelMqtt(), {}, {})
+    BotonActualizar("Reintentar conexión", reintentar)
 }

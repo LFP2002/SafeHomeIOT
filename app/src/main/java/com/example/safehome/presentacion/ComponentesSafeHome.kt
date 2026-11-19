@@ -13,14 +13,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.platform.LocalDensity
 import com.example.safehome.iot.*
 import com.example.safehome.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/** Ritmo compartido por las pantallas de producto. */
+object EspacioSafeHome {
+    val seccion = 24.dp
+    val tarjetas = 12.dp
+    val interior = 16.dp
+    val radio = 18.dp
+}
+
 @Composable fun NavegacionSafeHome(seleccion: Int, seleccionar: (Int) -> Unit) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+    val fuente = LocalDensity.current.fontScale
+    NavigationBar(modifier = Modifier.heightIn(min = if (fuente > 1.3f) 104.dp else 80.dp),
+        containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
         listOf("Panel", "Historial", "Cuenta").forEachIndexed { indice, titulo ->
             NavigationBarItem(selected = seleccion == indice, onClick = { seleccionar(indice) },
                 icon = { IconoSafeHome(listOf(IconoSafeHome.PANEL, IconoSafeHome.HISTORIAL, IconoSafeHome.CUENTA)[indice]) },
@@ -34,10 +47,10 @@ import java.util.Locale
 }
 
 @Composable fun CabeceraSafeHome(subtitulo: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp)
-        .background(Brush.horizontalGradient(listOf(SafeHomeBlue, SafeHomeViolet)), RoundedCornerShape(24.dp)).padding(18.dp),
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp)
+        .background(Brush.horizontalGradient(listOf(SafeHomeBlue, SafeHomeViolet)), RoundedCornerShape(20.dp)).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(46.dp).background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(16.dp)),
+        Box(Modifier.size(40.dp).background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(14.dp)),
             contentAlignment = Alignment.Center) {
             IconoSafeHome(IconoSafeHome.PANEL, tint = Color.White)
         }
@@ -55,12 +68,12 @@ import java.util.Locale
     tono: TonoEstado = TonoEstado.INFORMATIVO,
     contenido: @Composable ColumnScope.() -> Unit
 ) {
-    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(EspacioSafeHome.radio),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface)) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(EspacioSafeHome.interior), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 icono?.let { MedallonIcono(it, tono) }
                 Text(titulo, modifier = Modifier.weight(1f).semantics { heading() },
@@ -79,18 +92,19 @@ import java.util.Locale
 
 @Composable fun EtiquetaEstado(estado: EstadoVisual, desdeCache: Boolean = false) {
     val color = if (desdeCache) TonoEstado.AVISO.color() else estado.tono.color()
-    Row(Modifier.fillMaxWidth().background(color.copy(alpha = 0.08f), RoundedCornerShape(14.dp)).padding(12.dp),
+    Row(Modifier.background(color.copy(alpha = 0.08f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         IconoSafeHome(estado.icono, tint = color)
-        Text(if (desdeCache) "Último dato guardado: ${estado.texto}" else estado.texto,
-            modifier = Modifier.weight(1f), color = color, style = MaterialTheme.typography.labelLarge)
+        Text(if (desdeCache) "Último estado conocido: ${estado.texto}" else estado.texto,
+            modifier = Modifier.weight(1f, fill = false), color = color, style = MaterialTheme.typography.labelLarge)
     }
 }
 
 @Composable fun AvisoSafeHome(texto: String, tono: TonoEstado = TonoEstado.INFORMATIVO,
     icono: IconoSafeHome = IconoSafeHome.INFO) {
     val color = tono.color()
-    Row(Modifier.fillMaxWidth().background(color.copy(alpha = 0.08f), RoundedCornerShape(16.dp)).padding(12.dp),
+    Row(Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }
+        .background(color.copy(alpha = 0.08f), RoundedCornerShape(16.dp)).padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         IconoSafeHome(icono, tint = color)
         Text(texto, modifier = Modifier.weight(1f), color = color, style = MaterialTheme.typography.bodyMedium)
@@ -99,9 +113,9 @@ import java.util.Locale
 
 @Composable fun EncabezadoSeccion(etiqueta: String, titulo: String, detalle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(etiqueta, style = MaterialTheme.typography.labelMedium, color = SafeHomeViolet)
+        if (etiqueta.isNotBlank()) Text(etiqueta, style = MaterialTheme.typography.labelMedium, color = SafeHomeViolet)
         Text(titulo, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
-        Text(detalle, style = MaterialTheme.typography.bodyMedium, color = SafeHomeMuted)
+        if (detalle.isNotBlank()) Text(detalle, style = MaterialTheme.typography.bodyMedium, color = SafeHomeMuted)
     }
 }
 
@@ -122,18 +136,76 @@ import java.util.Locale
 }
 
 fun fechaHora(instante: Instante?): String = instante?.let {
-    SimpleDateFormat("dd/MM/yyyy HH:mm:ss z", Locale.getDefault()).format(Date(it.millis))
+    SimpleDateFormat("d MMM yyyy · HH:mm", Locale.forLanguageTag("es")).format(Date(it.millis))
 } ?: "Sin datos"
 
 @Composable fun <T> ContenidoLectura(lectura: Lectura<T>, contenido: @Composable (T) -> Unit) {
     when (lectura) {
         Lectura.Cargando -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Cargando datos…", style = MaterialTheme.typography.bodyMedium) }
         Lectura.SinDatos -> AvisoSafeHome("Sin datos disponibles.", TonoEstado.NEUTRO, IconoSafeHome.DESCONOCIDO)
-        Lectura.Invalida -> AvisoSafeHome("Datos incompatibles con el contrato de supervisión.", TonoEstado.CRITICO, IconoSafeHome.ERROR)
+        Lectura.Invalida -> AvisoSafeHome("No se pudo mostrar esta información.", TonoEstado.CRITICO, IconoSafeHome.ERROR)
         is Lectura.Error -> AvisoSafeHome(lectura.mensaje, TonoEstado.CRITICO, IconoSafeHome.ERROR)
         is Lectura.Dato -> {
-            if (lectura.desdeCache) AvisoSafeHome("Datos de caché: sin confirmación actual del servidor.", TonoEstado.AVISO, IconoSafeHome.HISTORIAL)
+            if (lectura.desdeCache) AvisoSafeHome("Último estado conocido; puede haber cambiado.", TonoEstado.NEUTRO, IconoSafeHome.HISTORIAL)
             contenido(lectura.valor)
         }
+    }
+}
+
+/** Dos columnas solo cuando ambas tarjetas tienen anchura útil, también con letra grande. */
+@Composable fun ParejaEstados(primero: @Composable () -> Unit, segundo: @Composable () -> Unit) {
+    val fuente = LocalDensity.current.fontScale
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth >= 328.dp && maxWidth / fuente >= 300.dp) {
+            Row(horizontalArrangement = Arrangement.spacedBy(EspacioSafeHome.tarjetas)) {
+                Box(Modifier.weight(1f)) { primero() }
+                Box(Modifier.weight(1f)) { segundo() }
+            }
+        } else Column(verticalArrangement = Arrangement.spacedBy(EspacioSafeHome.tarjetas)) { primero(); segundo() }
+    }
+}
+
+@Composable fun TarjetaEstado(titulo: String, estado: EstadoVisual, anterior: Boolean = false) {
+    val tono = if (anterior) TonoEstado.NEUTRO else estado.tono
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(EspacioSafeHome.radio),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, SafeHomeOutline)) {
+        Column(Modifier.padding(EspacioSafeHome.interior), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconoSafeHome(estado.icono, tint = tono.color())
+                Text(titulo, style = MaterialTheme.typography.bodyMedium, color = SafeHomeMuted, modifier = Modifier.weight(1f))
+            }
+            Text(estado.texto, style = MaterialTheme.typography.titleMedium, color = tono.color())
+            if (anterior) Text("Último estado conocido", style = MaterialTheme.typography.bodySmall, color = SafeHomeMuted)
+        }
+    }
+}
+
+@Composable fun AccionPrincipal(texto: String, icono: IconoSafeHome, habilitada: Boolean = true, accion: () -> Unit) {
+    Button(onClick = accion, enabled = habilitada, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+        IconoSafeHome(icono)
+        Spacer(Modifier.width(10.dp))
+        Text(texto, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable fun AccionSecundaria(texto: String, icono: IconoSafeHome, habilitada: Boolean = true, accion: () -> Unit) {
+    OutlinedButton(onClick = accion, enabled = habilitada, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = SafeHomeViolet),
+        shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+        IconoSafeHome(icono)
+        Spacer(Modifier.width(10.dp))
+        Text(texto, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable fun EstadoVacio(titulo: String = "Aún no hay eventos", detalle: String = "Aquí aparecerá la actividad de tu sistema") {
+    Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        MedallonIcono(IconoSafeHome.HISTORIAL, TonoEstado.NEUTRO)
+        Text(titulo, style = MaterialTheme.typography.titleMedium)
+        Text(detalle, color = SafeHomeMuted, style = MaterialTheme.typography.bodyMedium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
